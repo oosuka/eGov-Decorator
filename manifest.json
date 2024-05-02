@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "e-Gov Decorator",
+  "version": "1.0.0",
+  "description": "Decorate the brackets at elaws.e-gov.go.jp",
+  "content_scripts": [
+    {
+      "matches": ["https://elaws.e-gov.go.jp/*"],
+      "js": ["content.js"],
+      "css": ["style.css"]
+    }
+  ],
+  "icons": {
+    "32": "images/icon32.png",
+    "64": "images/icon64.png",
+    "128": "images/icon128.png"
+  }
+}
