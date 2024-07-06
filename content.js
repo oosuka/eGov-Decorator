@@ -62,6 +62,20 @@ function applyHighlight() {
   observer.observe(document.body, observerConfig); // 監視を再開
 }
 
+function removeHighlight() {
+  observer.disconnect(); // 監視を一時停止
+
+  // ハイライトを解除するロジック
+  document.querySelectorAll('span.highlight').forEach((span) => {
+    const parent = span.parentNode;
+    if (parent) {
+      parent.replaceChild(document.createTextNode(span.textContent), span);
+    }
+  });
+
+  observer.observe(document.body, observerConfig); // 監視を再開
+}
+
 const observerConfig = {
   childList: true,
   subtree: true,
@@ -69,12 +83,48 @@ const observerConfig = {
 };
 
 const observer = new MutationObserver((mutations) => {
-  applyHighlight();
+  chrome.storage.local.get(['decoratorEnabled'], (result) => {
+    if (result.decoratorEnabled) {
+      applyHighlight();
+    } else {
+      removeHighlight();
+    }
+  });
 });
 
 observer.observe(document.body, observerConfig);
 
 // 初期ロード時にも適用
 document.addEventListener('DOMContentLoaded', (event) => {
-  applyHighlight();
+  chrome.storage.local.get(['decoratorEnabled'], (result) => {
+    if (result.decoratorEnabled) {
+      applyHighlight();
+    } else {
+      removeHighlight();
+    }
+  });
+});
+
+// メッセージを受け取ってデコレーションを切り替える
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "toggle-decorator") {
+    chrome.storage.local.get(['decoratorEnabled'], (result) => {
+      if (result.decoratorEnabled) {
+        applyHighlight();
+      } else {
+        removeHighlight();
+      }
+    });
+  }
+});
+
+// ストレージの変更を監視し、デコレーションの状態が変更されたら適用または解除する
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.decoratorEnabled) {
+    if (changes.decoratorEnabled.newValue) {
+      applyHighlight();
+    } else {
+      removeHighlight();
+    }
+  }
 });

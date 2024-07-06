@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "e-Gov Decorator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Decorate the brackets at elaws.e-gov.go.jp",
   "content_scripts": [
     {
@@ -10,6 +10,18 @@
       "css": ["style.css"]
     }
   ],
+  "permissions": ["storage"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "toggle-decorator": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y"
+      },
+      "description": "Toggle e-Gov Decorator"
+    }
+  },
   "icons": {
     "32": "images/icon32.png",
     "64": "images/icon64.png",
