@@ -42,7 +42,7 @@ function applyHighlight() {
   observer.disconnect(); // 監視を一時停止
 
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-  let nodes = [];
+  const nodes = [];
   let node;
 
   while ((node = walker.nextNode())) {
@@ -53,7 +53,7 @@ function applyHighlight() {
 
   nodes.forEach((node) => {
     const parent = node.parentNode;
-    if (parent && parent.nodeName.toLowerCase() !== 'script' && parent.nodeName.toLowerCase() !== 'style') {
+    if (parent && !['script', 'style'].includes(parent.nodeName.toLowerCase())) {
       const highlightedContent = applyHighlightToNode(node);
       parent.replaceChild(highlightedContent, node);
     }
@@ -82,7 +82,7 @@ const observerConfig = {
   characterData: false
 };
 
-const observer = new MutationObserver((mutations) => {
+const observer = new MutationObserver(() => {
   chrome.storage.local.get(['decoratorEnabled'], (result) => {
     if (result.decoratorEnabled) {
       applyHighlight();
@@ -95,7 +95,7 @@ const observer = new MutationObserver((mutations) => {
 observer.observe(document.body, observerConfig);
 
 // 初期ロード時にも適用
-document.addEventListener('DOMContentLoaded', (event) => {
+document.addEventListener('DOMContentLoaded', () => {
   chrome.storage.local.get(['decoratorEnabled'], (result) => {
     if (result.decoratorEnabled) {
       applyHighlight();
@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
 });
 
 // メッセージを受け取ってデコレーションを切り替える
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message) => {
   if (message.action === "toggle-decorator") {
     chrome.storage.local.get(['decoratorEnabled'], (result) => {
       if (result.decoratorEnabled) {
