@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "e-Gov Decorator",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Decorate the brackets at elaws.e-gov.go.jp",
   "content_scripts": [
     {
