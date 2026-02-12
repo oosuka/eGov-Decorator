@@ -1,4 +1,4 @@
 .highlight {
-  background-color: #e6e6e6; /* 薄いグレーの背景色 */
-  color: #ffffff; /* 白の文字色 */
+  background-color: var(--egov-highlight-bg, #e6e6e6);
+  color: var(--egov-highlight-text, #ffffff);
 }
