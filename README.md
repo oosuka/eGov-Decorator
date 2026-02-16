@@ -97,3 +97,10 @@ e-Gov 法令ページ内の全角括弧 `（...）` をハイライト表示す�
 - `background.js`: ショートカット処理、バッジ更新、タブ/ウィンドウイベント監視
 - `content.js`: ハイライト適用、DOM 変化追従（`MutationObserver`）
 - `popup.html` + `options.js` + `options.css`: 色設定 UI
+
+## セキュリティ
+
+- 本拡張は外部サーバーへの送信機能（API連携、アップロード、Webhook等）を実装していません。
+- 保存データは `chrome.storage.local` 内の設定値（ON/OFF、色設定）のみです。
+- 権限は `storage` と `tabs` のみを使用し、対象外のサイトには動作しません。
+- 処理内容は対象URL上の表示装飾（ハイライト）に限定され、業務データの収集や外部転送は行いません。
