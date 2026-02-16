@@ -493,7 +493,7 @@ function removeHighlightInRoot(root) {
     }
   });
 
-  // L1/L2/L3 で分割された隣接テキストノードを再結合し、L0 再適用時の取りこぼしを防ぐ
+  // H2/H3/H4 で分割された隣接テキストノードを再結合し、H1 再適用時の取りこぼしを防ぐ
   touchedParents.forEach((parent) => {
     if (typeof parent.normalize === "function") {
       parent.normalize();

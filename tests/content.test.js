@@ -161,7 +161,7 @@ test("applyHighlightToNode: ネスト括弧は1塊として扱う", () => {
   assert.equal(fragment.childNodes[1].textContent, "（b（c）d）");
 });
 
-test("applyHighlightToNode: L1 相当では2階層目以降のみハイライト", () => {
+test("applyHighlightToNode: H2 相当では2階層目以降のみハイライト", () => {
   const { context, FakeTextNode } = createContentContext();
   const fragment = context.applyHighlightToNode(
     new FakeTextNode("■（あ（い（う）い）あ）■"),
@@ -175,7 +175,7 @@ test("applyHighlightToNode: L1 相当では2階層目以降のみハイライト
   assert.equal(fragment.childNodes[2].textContent, "あ）■");
 });
 
-test("applyHighlightToNode: L2 相当では3階層目以降のみハイライト", () => {
+test("applyHighlightToNode: H3 相当では3階層目以降のみハイライト", () => {
   const { context, FakeTextNode } = createContentContext();
   const fragment = context.applyHighlightToNode(
     new FakeTextNode("■（あ（い（う）い）あ）■"),
