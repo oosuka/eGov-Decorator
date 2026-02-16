@@ -66,7 +66,7 @@ function refreshBadgeForAllTabsFromStorage() {
 chrome.commands.onCommand.addListener((command) => {
   if (command === "toggle-decorator") {
     chrome.storage.local.get(["decoratorEnabled"], (result) => {
-      const newStatus = !result.decoratorEnabled;
+      const newStatus = !(result.decoratorEnabled !== false);
       chrome.storage.local.set({ decoratorEnabled: newStatus }, () => {
         refreshBadgeForAllTabs(newStatus);
       });
