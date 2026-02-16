@@ -75,7 +75,7 @@ chrome.commands.onCommand.addListener((command) => {
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({ decoratorEnabled: true });
-  refreshBadgeForAllTabsFromStorage();
+  refreshBadgeForAllTabs(true);
 });
 
 chrome.runtime.onStartup.addListener(() => {
