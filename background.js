@@ -29,6 +29,7 @@ function setBadgeForTab(tabId, url, enabled) {
 
 function withDecoratorEnabled(callback) {
   chrome.storage.local.get(["decoratorEnabled"], (result) => {
+    // Treat any value other than explicit false (including undefined / missing) as enabled by default.
     callback(result.decoratorEnabled !== false);
   });
 }
