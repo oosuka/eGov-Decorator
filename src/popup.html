@@ -13,15 +13,15 @@
       <p class="description">ハイライトの背景色と文字色を設定できます。</p>
 
       <form id="color-form">
-        <label class="field" for="bgColor">
-          <span>背景色</span>
+        <div class="field">
+          <label for="bgColor">背景色</label>
           <input id="bgColor" name="bgColor" type="color" />
-        </label>
+        </div>
 
-        <label class="field" for="textColor">
-          <span>文字色</span>
+        <div class="field">
+          <label for="textColor">文字色</label>
           <input id="textColor" name="textColor" type="color" />
-        </label>
+        </div>
 
         <div class="actions">
           <button type="submit">保存</button>
@@ -31,13 +31,24 @@
 
       <p id="status" class="status" aria-live="polite"></p>
 
-      <h2>ON/OFFの切替</h2>
-      <p class="description shortcut-intro">
-        ショートカットキーで ON/OFF を切り替えできます。
-      </p>
-      <div class="shortcut-lines">
-        <p class="description">Windows / Linux: Ctrl+Shift+X</p>
-        <p class="description">macOS: Command+Shift+X</p>
+      <h2>ハイライトレベル切替</h2>
+      <p class="description">ショートカットキーで順次切り替えできます。</p>
+      <div class="shortcut-panel">
+        <p class="shortcut-flow">H1 → H2 → H3 → H4 → OFF → H1</p>
+        <p class="description shortcut-note">
+          <span class="info-dot" aria-hidden="true">i</span>
+          <span>Hn: n階層目からハイライト</span>
+        </p>
+        <div class="shortcut-keys">
+          <p class="shortcut-row">
+            <span class="platform">Windows / Linux</span>
+            <kbd>Ctrl+Shift+X</kbd>
+          </p>
+          <p class="shortcut-row">
+            <span class="platform">macOS</span>
+            <kbd>Command+Shift+X</kbd>
+          </p>
+        </div>
       </div>
     </main>
 
