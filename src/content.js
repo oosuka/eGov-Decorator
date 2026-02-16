@@ -5,10 +5,38 @@ function createHighlightedElement(text) {
   return span;
 }
 
-const BRACKET_PATTERN = /（.*?）/;
+const BRACKET_PATTERN = /[（）]/;
 const DEFAULT_BG_COLOR = "#e6e6e6";
 const DEFAULT_TEXT_COLOR = "#ffffff";
 const DECORATOR_ENABLED_KEY = "decoratorEnabled";
+const HIGHLIGHT_LEVEL_KEY = "highlightLevel";
+const DEFAULT_HIGHLIGHT_LEVEL = 0;
+const OFF_HIGHLIGHT_LEVEL = 4;
+const MAX_HIGHLIGHT_LEVEL = OFF_HIGHLIGHT_LEVEL;
+const CROSS_NODE_CONTAINER_TAGS = new Set([
+  "p",
+  "div",
+  "li",
+  "dd",
+  "dt",
+  "section",
+  "article",
+  "main",
+  "aside",
+  "blockquote",
+]);
+const UNSAFE_CROSS_NODE_TAGS = new Set([
+  "table",
+  "thead",
+  "tbody",
+  "tfoot",
+  "tr",
+  "td",
+  "th",
+  "caption",
+  "colgroup",
+  "col",
+]);
 const HIGHLIGHT_BG_COLOR_KEY = "highlightBgColor";
 const HIGHLIGHT_TEXT_COLOR_KEY = "highlightTextColor";
 let currentHighlightBgColor = DEFAULT_BG_COLOR;
@@ -24,6 +52,33 @@ function getStoredColor(result, key, defaultColor) {
 
 function isDecoratorEnabled(value) {
   return value !== false;
+}
+
+function normalizeHighlightLevel(value) {
+  const level = Number(value);
+  if (!Number.isInteger(level)) return null;
+  if (level < DEFAULT_HIGHLIGHT_LEVEL || level > MAX_HIGHLIGHT_LEVEL) {
+    return null;
+  }
+  return level;
+}
+
+function getStoredHighlightLevel(result) {
+  const normalizedLevel = normalizeHighlightLevel(result[HIGHLIGHT_LEVEL_KEY]);
+  if (normalizedLevel != null) {
+    return normalizedLevel;
+  }
+  return isDecoratorEnabled(result[DECORATOR_ENABLED_KEY])
+    ? DEFAULT_HIGHLIGHT_LEVEL
+    : OFF_HIGHLIGHT_LEVEL;
+}
+
+function isHighlightEnabled(level) {
+  return level !== OFF_HIGHLIGHT_LEVEL;
+}
+
+function getMinHighlightDepth(level) {
+  return level + 1;
 }
 
 function applyColorChanges(changes) {
@@ -59,38 +114,300 @@ function notifyContentReady() {
   }
 }
 
-// テキストノードを分解し、対応する全角括弧の範囲だけを span.highlight で包む
-function applyHighlightToNode(node) {
-  let text = node.textContent;
-  let startIndex = 0;
-  let openBrackets = 0;
+function appendSegment(docFragment, text, shouldHighlight) {
+  if (!text) return;
+  if (shouldHighlight) {
+    docFragment.appendChild(createHighlightedElement(text));
+    return;
+  }
+  docFragment.appendChild(document.createTextNode(text));
+}
+
+function buildHighlightFragmentWithDepth(
+  text,
+  minHighlightDepth,
+  initialDepth,
+) {
   const docFragment = document.createDocumentFragment();
+  if (!text || text.length === 0) {
+    return { docFragment, endDepth: initialDepth, hasHighlight: false };
+  }
+
+  let depth = initialDepth;
+  const highlightByIndex = new Array(text.length).fill(false);
+  const localOpenPositions = [];
+  let hasHighlight = false;
+
+  function shouldHighlightChar(char, index) {
+    if (char === "（") {
+      depth += 1;
+      if (initialDepth === 0) {
+        localOpenPositions.push(index);
+      }
+      return depth >= minHighlightDepth;
+    }
+    if (char === "）") {
+      const shouldHighlight = depth >= minHighlightDepth;
+      if (depth > 0) {
+        depth -= 1;
+        if (initialDepth === 0 && localOpenPositions.length > 0) {
+          localOpenPositions.pop();
+        }
+      }
+      return shouldHighlight;
+    }
+    return depth >= minHighlightDepth && depth > 0;
+  }
 
   for (let i = 0; i < text.length; i++) {
-    if (text[i] === "（") {
-      if (openBrackets === 0) startIndex = i;
-      openBrackets++;
-    } else if (text[i] === "）") {
-      openBrackets--;
-      if (openBrackets === 0) {
-        if (startIndex > 0) {
-          docFragment.appendChild(
-            document.createTextNode(text.slice(0, startIndex)),
-          );
-        }
-        const matchedText = text.slice(startIndex, i + 1);
-        docFragment.appendChild(createHighlightedElement(matchedText));
-        text = text.slice(i + 1);
-        i = -1;
+    highlightByIndex[i] = shouldHighlightChar(text[i], i);
+  }
+
+  const danglingStart =
+    initialDepth === 0 && localOpenPositions.length > 0
+      ? localOpenPositions[0]
+      : null;
+  if (danglingStart != null) {
+    for (let i = danglingStart; i < highlightByIndex.length; i++) {
+      highlightByIndex[i] = false;
+    }
+  }
+
+  let segmentStart = 0;
+  let currentSegmentHighlighted = highlightByIndex[0];
+  if (currentSegmentHighlighted) hasHighlight = true;
+
+  for (let i = 1; i < text.length; i++) {
+    const shouldHighlight = highlightByIndex[i];
+    if (shouldHighlight !== currentSegmentHighlighted) {
+      appendSegment(
+        docFragment,
+        text.slice(segmentStart, i),
+        currentSegmentHighlighted,
+      );
+      segmentStart = i;
+      currentSegmentHighlighted = shouldHighlight;
+      if (shouldHighlight) {
+        hasHighlight = true;
       }
     }
   }
 
-  if (text.length > 0) {
-    docFragment.appendChild(document.createTextNode(text));
+  appendSegment(
+    docFragment,
+    text.slice(segmentStart),
+    currentSegmentHighlighted,
+  );
+
+  if (currentSegmentHighlighted) {
+    hasHighlight = true;
   }
 
+  return { docFragment, endDepth: depth, hasHighlight };
+}
+
+// テキストノードを分解し、指定ネスト階層以降のみ span.highlight で包む
+function applyHighlightToNode(
+  node,
+  minHighlightDepth = getMinHighlightDepth(currentHighlightLevel),
+) {
+  const text = node.textContent || "";
+  const { docFragment } = buildHighlightFragmentWithDepth(
+    text,
+    minHighlightDepth,
+    0,
+  );
   return docFragment;
+}
+
+function computeMatchedHighlightMask(text, minHighlightDepth) {
+  const length = text.length;
+  if (length === 0) return [];
+
+  const diff = new Array(length + 1).fill(0);
+  const openStack = [];
+
+  for (let i = 0; i < length; i++) {
+    const char = text[i];
+    if (char === "（") {
+      const depthAtOpen = openStack.length + 1;
+      openStack.push({ index: i, depthAtOpen });
+      continue;
+    }
+    if (char === "）" && openStack.length > 0) {
+      const open = openStack.pop();
+      if (open.depthAtOpen >= minHighlightDepth) {
+        diff[open.index] += 1;
+        diff[i + 1] -= 1;
+      }
+    }
+  }
+
+  const mask = new Array(length).fill(false);
+  let active = 0;
+  for (let i = 0; i < length; i++) {
+    active += diff[i];
+    mask[i] = active > 0;
+  }
+  return mask;
+}
+
+function buildFragmentFromMask(text, highlightMask) {
+  const docFragment = document.createDocumentFragment();
+  if (!text || text.length === 0) {
+    return { docFragment, hasHighlight: false };
+  }
+
+  let hasHighlight = false;
+  let segmentStart = 0;
+  let currentSegmentHighlighted = !!highlightMask[0];
+
+  if (currentSegmentHighlighted) {
+    hasHighlight = true;
+  }
+
+  for (let i = 1; i < text.length; i++) {
+    const shouldHighlight = !!highlightMask[i];
+    if (shouldHighlight !== currentSegmentHighlighted) {
+      appendSegment(
+        docFragment,
+        text.slice(segmentStart, i),
+        currentSegmentHighlighted,
+      );
+      segmentStart = i;
+      currentSegmentHighlighted = shouldHighlight;
+      if (shouldHighlight) {
+        hasHighlight = true;
+      }
+    }
+  }
+
+  appendSegment(
+    docFragment,
+    text.slice(segmentStart),
+    currentSegmentHighlighted,
+  );
+
+  return { docFragment, hasHighlight };
+}
+
+function fragmentHasHighlight(fragment) {
+  if (!fragment || !fragment.childNodes) return false;
+  return Array.from(fragment.childNodes).some(
+    (child) => child.classList && child.classList.contains("highlight"),
+  );
+}
+
+function isInsideHighlightElement(node) {
+  let current = node && node.parentNode;
+  while (current) {
+    if (current.classList && current.classList.contains("highlight")) {
+      return true;
+    }
+    current = current.parentNode;
+  }
+  return false;
+}
+
+function collectHighlightableTextNodes(root) {
+  if (!root) return [];
+
+  const walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false,
+  );
+  const nodes = [];
+  let node;
+
+  while ((node = walker.nextNode())) {
+    const parent = node.parentNode;
+    if (!parent) continue;
+
+    const parentName = parent.nodeName.toLowerCase();
+    const isValidParent = !["script", "style"].includes(parentName);
+    if (!isValidParent || isInsideHighlightElement(node)) {
+      continue;
+    }
+    nodes.push(node);
+  }
+
+  return nodes;
+}
+
+function getCrossNodeContainer(node) {
+  let current = node && node.parentNode;
+
+  while (current && current !== document.body) {
+    const tagName = current.nodeName && current.nodeName.toLowerCase();
+    if (UNSAFE_CROSS_NODE_TAGS.has(tagName)) {
+      return null;
+    }
+    if (CROSS_NODE_CONTAINER_TAGS.has(tagName)) {
+      return current;
+    }
+    current = current.parentNode;
+  }
+
+  return document.body || null;
+}
+
+function applyHighlightInContainer(root, minHighlightDepth) {
+  if (collectDecoratableTextNodes(root).length === 0) {
+    return;
+  }
+
+  const nodes = collectHighlightableTextNodes(root);
+  const groupedByContainer = new Map();
+
+  nodes.forEach((node) => {
+    const parent = node.parentNode;
+    if (!parent) return;
+
+    const container = getCrossNodeContainer(node);
+    const isCrossNodeEnabled = !!container;
+    if (!isCrossNodeEnabled) {
+      const highlightedContent = applyHighlightToNode(node, minHighlightDepth);
+      if (fragmentHasHighlight(highlightedContent)) {
+        parent.replaceChild(highlightedContent, node);
+      }
+      return;
+    }
+
+    if (!groupedByContainer.has(container)) {
+      groupedByContainer.set(container, []);
+    }
+    groupedByContainer.get(container).push(node);
+  });
+
+  groupedByContainer.forEach((containerNodes) => {
+    const texts = containerNodes.map((node) => node.textContent || "");
+    const joinedText = texts.join("");
+    const highlightMask = computeMatchedHighlightMask(
+      joinedText,
+      minHighlightDepth,
+    );
+
+    let offset = 0;
+    containerNodes.forEach((node, index) => {
+      const text = texts[index];
+      const nextOffset = offset + text.length;
+      const nodeMask = highlightMask.slice(offset, nextOffset);
+      const { docFragment, hasHighlight } = buildFragmentFromMask(
+        text,
+        nodeMask,
+      );
+      offset = nextOffset;
+
+      if (hasHighlight) {
+        const parent = node.parentNode;
+        if (parent) {
+          parent.replaceChild(docFragment, node);
+        }
+      }
+    });
+  });
 }
 
 function collectDecoratableTextNodes(root) {
@@ -126,14 +443,8 @@ function collectDecoratableTextNodes(root) {
 }
 
 function applyHighlightInRoot(root) {
-  const nodes = collectDecoratableTextNodes(root);
-  nodes.forEach((node) => {
-    const parent = node.parentNode;
-    if (parent) {
-      const highlightedContent = applyHighlightToNode(node);
-      parent.replaceChild(highlightedContent, node);
-    }
-  });
+  const minHighlightDepth = getMinHighlightDepth(currentHighlightLevel);
+  applyHighlightInContainer(root, minHighlightDepth);
 }
 
 function applyHighlightColors(bgColor, textColor) {
@@ -168,14 +479,28 @@ function applyHighlight(root = document.body) {
   });
 }
 
+function removeHighlightInRoot(root) {
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  const touchedParents = new Set();
+  root.querySelectorAll("span.highlight").forEach((span) => {
+    const parent = span.parentNode;
+    if (parent) {
+      parent.replaceChild(document.createTextNode(span.textContent), span);
+      touchedParents.add(parent);
+    }
+  });
+
+  // L1/L2/L3 で分割された隣接テキストノードを再結合し、L0 再適用時の取りこぼしを防ぐ
+  touchedParents.forEach((parent) => {
+    if (typeof parent.normalize === "function") {
+      parent.normalize();
+    }
+  });
+}
+
 function removeHighlight() {
   withObserverPaused(() => {
-    document.querySelectorAll("span.highlight").forEach((span) => {
-      const parent = span.parentNode;
-      if (parent) {
-        parent.replaceChild(document.createTextNode(span.textContent), span);
-      }
-    });
+    removeHighlightInRoot(document);
   });
 }
 
@@ -185,30 +510,36 @@ const observerConfig = {
   characterData: true,
 };
 
-let decoratorEnabled = true;
+let currentHighlightLevel = DEFAULT_HIGHLIGHT_LEVEL;
 let isObserving = false;
 let scheduled = false;
 
 // 変更通知は1フレームにまとめ、全体再走査の回数を抑える
 function scheduleHighlightRefresh() {
-  if (!decoratorEnabled || scheduled) return;
+  if (!isHighlightEnabled(currentHighlightLevel) || scheduled) return;
 
   scheduled = true;
   requestAnimationFrame(() => {
     scheduled = false;
-    if (decoratorEnabled) {
+    if (isHighlightEnabled(currentHighlightLevel)) {
       applyHighlight();
     }
   });
 }
 
-function setDecoratorEnabled(enabled) {
-  decoratorEnabled = enabled;
-  if (decoratorEnabled) {
-    applyHighlight();
-  } else {
-    removeHighlight();
-  }
+function setHighlightLevel(level) {
+  const normalizedLevel = normalizeHighlightLevel(level);
+  const nextLevel =
+    normalizedLevel != null ? normalizedLevel : DEFAULT_HIGHLIGHT_LEVEL;
+  if (nextLevel === currentHighlightLevel) return;
+
+  currentHighlightLevel = nextLevel;
+  withObserverPaused(() => {
+    removeHighlightInRoot(document);
+    if (isHighlightEnabled(currentHighlightLevel)) {
+      applyHighlightInRoot(document.body);
+    }
+  });
 }
 
 const observer = new MutationObserver(() => {
@@ -228,9 +559,14 @@ function startObserverWhenReady() {
 function initializeDecorator() {
   // storage は初期化時に1回だけ読み込み、以降はメモリ状態を参照する
   chrome.storage.local.get(
-    [DECORATOR_ENABLED_KEY, HIGHLIGHT_BG_COLOR_KEY, HIGHLIGHT_TEXT_COLOR_KEY],
+    [
+      DECORATOR_ENABLED_KEY,
+      HIGHLIGHT_LEVEL_KEY,
+      HIGHLIGHT_BG_COLOR_KEY,
+      HIGHLIGHT_TEXT_COLOR_KEY,
+    ],
     (result) => {
-      decoratorEnabled = isDecoratorEnabled(result[DECORATOR_ENABLED_KEY]);
+      currentHighlightLevel = getStoredHighlightLevel(result);
       currentHighlightBgColor = getStoredColor(
         result,
         HIGHLIGHT_BG_COLOR_KEY,
@@ -243,7 +579,11 @@ function initializeDecorator() {
       );
       applyHighlightColors(currentHighlightBgColor, currentHighlightTextColor);
       startObserverWhenReady();
-      setDecoratorEnabled(decoratorEnabled);
+      if (isHighlightEnabled(currentHighlightLevel)) {
+        applyHighlight();
+      } else {
+        removeHighlight();
+      }
       notifyContentReady();
     },
   );
@@ -264,12 +604,22 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
   applyColorChanges(changes);
 
-  if (changes[DECORATOR_ENABLED_KEY]) {
-    const nextValue = isDecoratorEnabled(
-      changes[DECORATOR_ENABLED_KEY].newValue,
+  if (changes[HIGHLIGHT_LEVEL_KEY]) {
+    const nextLevel = normalizeHighlightLevel(
+      changes[HIGHLIGHT_LEVEL_KEY].newValue,
     );
-    if (nextValue !== decoratorEnabled) {
-      setDecoratorEnabled(nextValue);
+    if (nextLevel != null) {
+      setHighlightLevel(nextLevel);
+      return;
     }
+  }
+
+  if (changes[DECORATOR_ENABLED_KEY]) {
+    const nextLevel = isDecoratorEnabled(
+      changes[DECORATOR_ENABLED_KEY].newValue,
+    )
+      ? DEFAULT_HIGHLIGHT_LEVEL
+      : OFF_HIGHLIGHT_LEVEL;
+    setHighlightLevel(nextLevel);
   }
 });

@@ -1,6 +1,9 @@
 const TARGET_URL_PATTERN = /^https:\/\/(?:elaws|laws)\.e-gov\.go\.jp\//;
 const DECORATOR_ENABLED_KEY = "decoratorEnabled";
-const BADGE_TEXT_ON = "ON";
+const HIGHLIGHT_LEVEL_KEY = "highlightLevel";
+const DEFAULT_HIGHLIGHT_LEVEL = 0;
+const OFF_HIGHLIGHT_LEVEL = 4;
+const MAX_HIGHLIGHT_LEVEL = OFF_HIGHLIGHT_LEVEL;
 const BADGE_TEXT_OFF = "OFF";
 const BADGE_BG_ON = "#d93025";
 const BADGE_BG_OFF = "#188038";
@@ -15,14 +18,48 @@ function isDecoratorEnabled(value) {
   return value !== false;
 }
 
-function getStoredDecoratorEnabled(result) {
-  return isDecoratorEnabled(result[DECORATOR_ENABLED_KEY]);
+function normalizeHighlightLevel(value) {
+  const level = Number(value);
+  if (!Number.isInteger(level)) return null;
+  if (level < DEFAULT_HIGHLIGHT_LEVEL || level > MAX_HIGHLIGHT_LEVEL) {
+    return null;
+  }
+  return level;
 }
 
-function setBadgeForTab(tabId, url, enabled) {
+function getStoredHighlightLevel(result) {
+  const normalizedLevel = normalizeHighlightLevel(result[HIGHLIGHT_LEVEL_KEY]);
+  if (normalizedLevel != null) {
+    return normalizedLevel;
+  }
+  return isDecoratorEnabled(result[DECORATOR_ENABLED_KEY])
+    ? DEFAULT_HIGHLIGHT_LEVEL
+    : OFF_HIGHLIGHT_LEVEL;
+}
+
+function isHighlightEnabled(level) {
+  return level !== OFF_HIGHLIGHT_LEVEL;
+}
+
+function getBadgeText(level) {
+  return isHighlightEnabled(level) ? `H${level + 1}` : BADGE_TEXT_OFF;
+}
+
+function getBadgeColor(level) {
+  return isHighlightEnabled(level) ? BADGE_BG_ON : BADGE_BG_OFF;
+}
+
+function getNextHighlightLevel(level) {
+  if (level >= MAX_HIGHLIGHT_LEVEL || level < DEFAULT_HIGHLIGHT_LEVEL) {
+    return DEFAULT_HIGHLIGHT_LEVEL;
+  }
+  return level + 1;
+}
+
+function setBadgeForTab(tabId, url, highlightLevel) {
   if (tabId == null || !actionApi) return;
   const isTarget = isTargetUrl(url);
-  const nextBadgeState = isTarget ? (enabled ? "on" : "off") : "hidden";
+  const nextBadgeState = isTarget ? `level-${highlightLevel}` : "hidden";
   if (badgeStateCache.get(tabId) === nextBadgeState) return;
 
   if (typeof actionApi.setPopup === "function") {
@@ -38,23 +75,52 @@ function setBadgeForTab(tabId, url, enabled) {
     return;
   }
 
-  const text = enabled ? BADGE_TEXT_ON : BADGE_TEXT_OFF;
-  const color = enabled ? BADGE_BG_ON : BADGE_BG_OFF;
-  actionApi.setBadgeText({ tabId, text });
-  actionApi.setBadgeBackgroundColor({ tabId, color });
+  actionApi.setBadgeText({ tabId, text: getBadgeText(highlightLevel) });
+  actionApi.setBadgeBackgroundColor({
+    tabId,
+    color: getBadgeColor(highlightLevel),
+  });
   badgeStateCache.set(tabId, nextBadgeState);
 }
 
-function withDecoratorEnabled(callback) {
-  chrome.storage.local.get([DECORATOR_ENABLED_KEY], (result) => {
-    // Treat any value other than explicit false (including undefined / missing) as enabled by default.
-    callback(getStoredDecoratorEnabled(result));
-  });
+function withHighlightLevel(callback) {
+  chrome.storage.local.get(
+    [HIGHLIGHT_LEVEL_KEY, DECORATOR_ENABLED_KEY],
+    (result) => {
+      callback(getStoredHighlightLevel(result));
+    },
+  );
+}
+
+function saveHighlightLevel(highlightLevel, callback) {
+  chrome.storage.local.set(
+    {
+      [HIGHLIGHT_LEVEL_KEY]: highlightLevel,
+      // Keep legacy key in sync for backward compatibility.
+      [DECORATOR_ENABLED_KEY]: isHighlightEnabled(highlightLevel),
+    },
+    callback,
+  );
+}
+
+function readHighlightLevelFromChanges(changes) {
+  if (changes[HIGHLIGHT_LEVEL_KEY]) {
+    const normalized = normalizeHighlightLevel(
+      changes[HIGHLIGHT_LEVEL_KEY].newValue,
+    );
+    return normalized != null ? normalized : DEFAULT_HIGHLIGHT_LEVEL;
+  }
+  if (changes[DECORATOR_ENABLED_KEY]) {
+    return isDecoratorEnabled(changes[DECORATOR_ENABLED_KEY].newValue)
+      ? DEFAULT_HIGHLIGHT_LEVEL
+      : OFF_HIGHLIGHT_LEVEL;
+  }
+  return null;
 }
 
 function refreshBadgeForTab(tabId, url) {
-  withDecoratorEnabled((enabled) => {
-    setBadgeForTab(tabId, url, enabled);
+  withHighlightLevel((highlightLevel) => {
+    setBadgeForTab(tabId, url, highlightLevel);
   });
 }
 
@@ -66,17 +132,17 @@ function refreshBadgeForActiveTab() {
   });
 }
 
-function refreshBadgeForAllTabs(enabled) {
+function refreshBadgeForAllTabs(highlightLevel) {
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
       if (tab.id == null) return;
-      setBadgeForTab(tab.id, tab.url, enabled);
+      setBadgeForTab(tab.id, tab.url, highlightLevel);
     });
   });
 }
 
 function refreshBadgeForAllTabsFromStorage() {
-  withDecoratorEnabled(refreshBadgeForAllTabs);
+  withHighlightLevel(refreshBadgeForAllTabs);
 }
 
 function handleContentReadyMessage(message, sender) {
@@ -88,18 +154,18 @@ function handleContentReadyMessage(message, sender) {
 
 chrome.commands.onCommand.addListener((command) => {
   if (command === "toggle-decorator") {
-    chrome.storage.local.get([DECORATOR_ENABLED_KEY], (result) => {
-      const newStatus = !getStoredDecoratorEnabled(result);
-      chrome.storage.local.set({ [DECORATOR_ENABLED_KEY]: newStatus }, () => {
-        refreshBadgeForAllTabs(newStatus);
+    withHighlightLevel((currentLevel) => {
+      const nextLevel = getNextHighlightLevel(currentLevel);
+      saveHighlightLevel(nextLevel, () => {
+        refreshBadgeForAllTabs(nextLevel);
       });
     });
   }
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.set({ [DECORATOR_ENABLED_KEY]: true });
-  refreshBadgeForAllTabs(true);
+  saveHighlightLevel(DEFAULT_HIGHLIGHT_LEVEL);
+  refreshBadgeForAllTabs(DEFAULT_HIGHLIGHT_LEVEL);
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -138,11 +204,10 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "local" || !changes[DECORATOR_ENABLED_KEY]) return;
-  const { oldValue, newValue } = changes[DECORATOR_ENABLED_KEY];
-  if (oldValue === newValue) return;
-  const enabled = isDecoratorEnabled(newValue);
-  refreshBadgeForAllTabs(enabled);
+  if (areaName !== "local") return;
+  const highlightLevel = readHighlightLevelFromChanges(changes);
+  if (highlightLevel == null) return;
+  refreshBadgeForAllTabs(highlightLevel);
 });
 
 chrome.runtime.onMessage.addListener((message, sender) => {
