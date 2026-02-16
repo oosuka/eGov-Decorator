@@ -1,7 +1,7 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const path = require('node:path');
-const { loadScript } = require('./helpers/load-script');
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const { loadScript } = require("./helpers/load-script");
 
 class FakeTextNode {
   constructor(value) {
@@ -14,12 +14,13 @@ class FakeTextNode {
 class FakeElement {
   constructor(tagName) {
     this.nodeName = tagName.toUpperCase();
-    this.className = '';
-    this.textContent = '';
+    this.className = "";
+    this.textContent = "";
     this.childNodes = [];
     this.parentNode = null;
     this.classList = {
-      contains: (name) => this.className.split(' ').filter(Boolean).includes(name)
+      contains: (name) =>
+        this.className.split(" ").filter(Boolean).includes(name),
     };
   }
 
@@ -54,7 +55,7 @@ function walkTextNodes(root, result = []) {
 
 function createContentContext() {
   const fakeDocument = {
-    readyState: 'loading',
+    readyState: "loading",
     body: null,
     documentElement: { style: { setProperty: () => {} } },
     addEventListener: () => {},
@@ -69,9 +70,9 @@ function createContentContext() {
         nextNode: () => {
           if (idx >= nodes.length) return null;
           return nodes[idx++];
-        }
+        },
       };
-    }
+    },
   };
 
   const context = {
@@ -85,47 +86,49 @@ function createContentContext() {
     chrome: {
       storage: {
         local: { get: (_keys, cb) => cb({}) },
-        onChanged: { addListener: () => {} }
-      }
+        onChanged: { addListener: () => {} },
+      },
     },
-    console
+    console,
   };
 
-  loadScript(path.resolve(__dirname, '..', 'content.js'), context);
+  loadScript(path.resolve(__dirname, "..", "content.js"), context);
   return { context, FakeElement, FakeTextNode };
 }
 
-test('applyHighlightToNode: 括弧部分のみハイライト要素化', () => {
+test("applyHighlightToNode: 括弧部分のみハイライト要素化", () => {
   const { context, FakeTextNode } = createContentContext();
-  const fragment = context.applyHighlightToNode(new FakeTextNode('abc（X）def'));
+  const fragment = context.applyHighlightToNode(
+    new FakeTextNode("abc（X）def"),
+  );
 
   assert.equal(fragment.childNodes.length, 3);
-  assert.equal(fragment.childNodes[0].textContent, 'abc');
-  assert.equal(fragment.childNodes[1].className, 'highlight');
-  assert.equal(fragment.childNodes[1].textContent, '（X）');
-  assert.equal(fragment.childNodes[2].textContent, 'def');
+  assert.equal(fragment.childNodes[0].textContent, "abc");
+  assert.equal(fragment.childNodes[1].className, "highlight");
+  assert.equal(fragment.childNodes[1].textContent, "（X）");
+  assert.equal(fragment.childNodes[2].textContent, "def");
 });
 
-test('collectDecoratableTextNodes: script/style と既存 highlight 内を除外', () => {
+test("collectDecoratableTextNodes: script/style と既存 highlight 内を除外", () => {
   const { context, FakeElement, FakeTextNode } = createContentContext();
 
-  const root = new FakeElement('div');
+  const root = new FakeElement("div");
 
-  const p = new FakeElement('p');
-  const targetText = new FakeTextNode('対象（A）');
+  const p = new FakeElement("p");
+  const targetText = new FakeTextNode("対象（A）");
   p.appendChild(targetText);
 
-  const script = new FakeElement('script');
-  const skippedByScript = new FakeTextNode('skip（B）');
+  const script = new FakeElement("script");
+  const skippedByScript = new FakeTextNode("skip（B）");
   script.appendChild(skippedByScript);
 
-  const highlightedSpan = new FakeElement('span');
-  highlightedSpan.className = 'highlight';
-  const skippedByHighlight = new FakeTextNode('skip（C）');
+  const highlightedSpan = new FakeElement("span");
+  highlightedSpan.className = "highlight";
+  const skippedByHighlight = new FakeTextNode("skip（C）");
   highlightedSpan.appendChild(skippedByHighlight);
 
-  const plain = new FakeElement('p');
-  const skippedByPattern = new FakeTextNode('括弧なし');
+  const plain = new FakeElement("p");
+  const skippedByPattern = new FakeTextNode("括弧なし");
   plain.appendChild(skippedByPattern);
 
   root.appendChild(p);

@@ -1,13 +1,13 @@
 function createHighlightedElement(text) {
-  const span = document.createElement('span');
-  span.className = 'highlight';
+  const span = document.createElement("span");
+  span.className = "highlight";
   span.textContent = text;
   return span;
 }
 
 const BRACKET_PATTERN = /（.*?）/;
-const DEFAULT_BG_COLOR = '#e6e6e6';
-const DEFAULT_TEXT_COLOR = '#ffffff';
+const DEFAULT_BG_COLOR = "#e6e6e6";
+const DEFAULT_TEXT_COLOR = "#ffffff";
 let currentHighlightBgColor = DEFAULT_BG_COLOR;
 let currentHighlightTextColor = DEFAULT_TEXT_COLOR;
 
@@ -19,14 +19,16 @@ function applyHighlightToNode(node) {
   const docFragment = document.createDocumentFragment();
 
   for (let i = 0; i < text.length; i++) {
-    if (text[i] === '（') {
+    if (text[i] === "（") {
       if (openBrackets === 0) startIndex = i;
       openBrackets++;
-    } else if (text[i] === '）') {
+    } else if (text[i] === "）") {
       openBrackets--;
       if (openBrackets === 0) {
         if (startIndex > 0) {
-          docFragment.appendChild(document.createTextNode(text.slice(0, startIndex)));
+          docFragment.appendChild(
+            document.createTextNode(text.slice(0, startIndex)),
+          );
         }
         const matchedText = text.slice(startIndex, i + 1);
         docFragment.appendChild(createHighlightedElement(matchedText));
@@ -46,7 +48,12 @@ function applyHighlightToNode(node) {
 function collectDecoratableTextNodes(root) {
   if (!root) return [];
 
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+  const walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false,
+  );
   const nodes = [];
   let node;
 
@@ -55,9 +62,14 @@ function collectDecoratableTextNodes(root) {
     if (!parent) continue;
 
     const parentName = parent.nodeName.toLowerCase();
-    const isValidParent = !['script', 'style'].includes(parentName);
-    const isAlreadyHighlighted = parent.classList && parent.classList.contains('highlight');
-    if (isValidParent && !isAlreadyHighlighted && BRACKET_PATTERN.test(node.nodeValue)) {
+    const isValidParent = !["script", "style"].includes(parentName);
+    const isAlreadyHighlighted =
+      parent.classList && parent.classList.contains("highlight");
+    if (
+      isValidParent &&
+      !isAlreadyHighlighted &&
+      BRACKET_PATTERN.test(node.nodeValue)
+    ) {
       nodes.push(node);
     }
   }
@@ -80,8 +92,11 @@ function applyHighlightColors(bgColor, textColor) {
   const root = document.documentElement;
   if (!root) return;
 
-  root.style.setProperty('--egov-highlight-bg', bgColor || DEFAULT_BG_COLOR);
-  root.style.setProperty('--egov-highlight-text', textColor || DEFAULT_TEXT_COLOR);
+  root.style.setProperty("--egov-highlight-bg", bgColor || DEFAULT_BG_COLOR);
+  root.style.setProperty(
+    "--egov-highlight-text",
+    textColor || DEFAULT_TEXT_COLOR,
+  );
 }
 
 function withObserverPaused(callback) {
@@ -107,7 +122,7 @@ function applyHighlight(root = document.body) {
 
 function removeHighlight() {
   withObserverPaused(() => {
-    document.querySelectorAll('span.highlight').forEach((span) => {
+    document.querySelectorAll("span.highlight").forEach((span) => {
       const parent = span.parentNode;
       if (parent) {
         parent.replaceChild(document.createTextNode(span.textContent), span);
@@ -119,7 +134,7 @@ function removeHighlight() {
 const observerConfig = {
   childList: true,
   subtree: true,
-  characterData: true
+  characterData: true,
 };
 
 let decoratorEnabled = true;
@@ -164,33 +179,41 @@ function startObserverWhenReady() {
 
 function initializeDecorator() {
   // storage は初期化時に1回だけ読み込み、以降はメモリ状態を参照する
-  chrome.storage.local.get(['decoratorEnabled', 'highlightBgColor', 'highlightTextColor'], (result) => {
-    decoratorEnabled = result.decoratorEnabled !== false;
-    currentHighlightBgColor = result.highlightBgColor || DEFAULT_BG_COLOR;
-    currentHighlightTextColor = result.highlightTextColor || DEFAULT_TEXT_COLOR;
-    applyHighlightColors(currentHighlightBgColor, currentHighlightTextColor);
-    startObserverWhenReady();
-    setDecoratorEnabled(decoratorEnabled);
-  });
+  chrome.storage.local.get(
+    ["decoratorEnabled", "highlightBgColor", "highlightTextColor"],
+    (result) => {
+      decoratorEnabled = result.decoratorEnabled !== false;
+      currentHighlightBgColor = result.highlightBgColor || DEFAULT_BG_COLOR;
+      currentHighlightTextColor =
+        result.highlightTextColor || DEFAULT_TEXT_COLOR;
+      applyHighlightColors(currentHighlightBgColor, currentHighlightTextColor);
+      startObserverWhenReady();
+      setDecoratorEnabled(decoratorEnabled);
+    },
+  );
 }
 
 // 読み込み済みなら即初期化、未完了なら DOMContentLoaded 待ち
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeDecorator, { once: true });
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializeDecorator, {
+    once: true,
+  });
 } else {
   initializeDecorator();
 }
 
 // storage 変更時のみメモリ状態を更新して反映
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local') return;
+  if (area !== "local") return;
 
   if (changes.highlightBgColor || changes.highlightTextColor) {
     if (changes.highlightBgColor) {
-      currentHighlightBgColor = changes.highlightBgColor.newValue || DEFAULT_BG_COLOR;
+      currentHighlightBgColor =
+        changes.highlightBgColor.newValue || DEFAULT_BG_COLOR;
     }
     if (changes.highlightTextColor) {
-      currentHighlightTextColor = changes.highlightTextColor.newValue || DEFAULT_TEXT_COLOR;
+      currentHighlightTextColor =
+        changes.highlightTextColor.newValue || DEFAULT_TEXT_COLOR;
     }
     applyHighlightColors(currentHighlightBgColor, currentHighlightTextColor);
   }

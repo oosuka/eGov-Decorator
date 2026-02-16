@@ -1,7 +1,31 @@
 {
   "name": "egov-decorator",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "check": "node --check content.js && node --check background.js && node --check options.js",
+    "lint": "eslint \"*.js\" \"tests/**/*.js\"",
+    "lint:fix": "eslint \"*.js\" \"tests/**/*.js\" --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.0",
+    "prettier": "^3.5.3"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,json,md}": [
+      "prettier --write"
+    ],
+    "*.js": [
+      "eslint --fix"
+    ],
+    "tests/**/*.js": [
+      "eslint --fix"
+    ]
   }
 }
