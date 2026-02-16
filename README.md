@@ -93,9 +93,10 @@ e-Gov 法令ページ内の全角括弧 `（...）` をハイライト表示す�
 
 ## ファイル構成
 
-- `background.js`: ショートカット処理、バッジ更新、タブ/ウィンドウイベント監視
-- `content.js`: ハイライト適用、DOM 変化追従（`MutationObserver`）
-- `popup.html` + `options.js` + `options.css`: 色設定 UI
+- `src/background.js`: ショートカット処理、バッジ更新、タブ/ウィンドウイベント監視
+- `src/content.js`: ハイライト適用、DOM 変化追従（`MutationObserver`）
+- `src/popup.html` + `src/options.js` + `src/options.css`: 色設定 UI
+- `assets/icons/`: 拡張アイコン
 - `tests/`: `node:test` ベースの単体テスト
 
 ## テスト実行

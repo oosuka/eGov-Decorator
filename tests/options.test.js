@@ -62,7 +62,7 @@ function createOptionsContext({ storedValues = {} } = {}) {
     console,
   };
 
-  loadScript(path.resolve(__dirname, "..", "options.js"), context);
+  loadScript(path.resolve(__dirname, "..", "src", "options.js"), context);
 
   return {
     context,

@@ -6,10 +6,10 @@ module.exports = {
     node: true,
   },
   extends: ["eslint:recommended"],
-  ignorePatterns: ["images/**"],
+  ignorePatterns: ["assets/icons/**"],
   overrides: [
     {
-      files: ["background.js", "content.js", "options.js"],
+      files: ["src/background.js", "src/content.js", "src/options.js"],
       env: {
         browser: true,
         node: false,

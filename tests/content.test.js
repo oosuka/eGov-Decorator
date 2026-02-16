@@ -92,7 +92,7 @@ function createContentContext() {
     console,
   };
 
-  loadScript(path.resolve(__dirname, "..", "content.js"), context);
+  loadScript(path.resolve(__dirname, "..", "src", "content.js"), context);
   return { context, FakeElement, FakeTextNode };
 }
 

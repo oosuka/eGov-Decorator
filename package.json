@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "test": "node --test",
-    "check": "node --check content.js && node --check background.js && node --check options.js",
-    "lint": "eslint \"*.js\" \"tests/**/*.js\"",
-    "lint:fix": "eslint \"*.js\" \"tests/**/*.js\" --fix",
+    "check": "node --check src/content.js && node --check src/background.js && node --check src/options.js",
+    "lint": "eslint \".eslintrc.cjs\" \"src/**/*.js\" \"tests/**/*.js\"",
+    "lint:fix": "eslint \".eslintrc.cjs\" \"src/**/*.js\" \"tests/**/*.js\" --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky install"
@@ -21,7 +21,7 @@
     "*.{js,cjs,mjs,json,md}": [
       "prettier --write"
     ],
-    "*.js": [
+    "src/**/*.js": [
       "eslint --fix"
     ],
     "tests/**/*.js": [

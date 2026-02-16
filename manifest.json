@@ -6,20 +6,20 @@
   "content_scripts": [
     {
       "matches": ["https://elaws.e-gov.go.jp/*", "https://laws.e-gov.go.jp/*"],
-      "js": ["content.js"],
-      "css": ["style.css"]
+      "js": ["src/content.js"],
+      "css": ["src/style.css"]
     }
   ],
   "permissions": ["storage", "tabs"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background.js"
   },
   "action": {
     "default_title": "e-Gov Decorator",
     "default_icon": {
-      "32": "images/icon32.png",
-      "64": "images/icon64.png",
-      "128": "images/icon128.png"
+      "32": "assets/icons/icon32.png",
+      "64": "assets/icons/icon64.png",
+      "128": "assets/icons/icon128.png"
     }
   },
   "commands": {
@@ -32,8 +32,8 @@
     }
   },
   "icons": {
-    "32": "images/icon32.png",
-    "64": "images/icon64.png",
-    "128": "images/icon128.png"
+    "32": "assets/icons/icon32.png",
+    "64": "assets/icons/icon64.png",
+    "128": "assets/icons/icon128.png"
   }
 }

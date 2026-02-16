@@ -75,7 +75,7 @@ function createBackgroundHarness(options = {}) {
   };
 
   const context = { chrome, Map, console };
-  loadScript(path.resolve(__dirname, "..", "background.js"), context);
+  loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
 
   return { context, events, calls, storageSets };
 }
@@ -96,7 +96,7 @@ test("setBadgeForTab: 対象URLは ON バッジを設定", () => {
   context.setBadgeForTab(7, "https://laws.e-gov.go.jp/test", true);
 
   assert.deepEqual(normalize(calls), [
-    ["setPopup", { tabId: 7, popup: "popup.html" }],
+    ["setPopup", { tabId: 7, popup: "src/popup.html" }],
     ["setBadgeText", { tabId: 7, text: "ON" }],
     ["setBadgeBackgroundColor", { tabId: 7, color: "#d93025" }],
   ]);
@@ -130,7 +130,7 @@ test("commands.onCommand: toggle-decorator で状態を反転して全タブ更�
 
   assert.deepEqual(normalize(storageSets.at(-1)), { decoratorEnabled: false });
   assert.deepEqual(normalize(calls.slice(-3)), [
-    ["setPopup", { tabId: 1, popup: "popup.html" }],
+    ["setPopup", { tabId: 1, popup: "src/popup.html" }],
     ["setBadgeText", { tabId: 1, text: "OFF" }],
     ["setBadgeBackgroundColor", { tabId: 1, color: "#188038" }],
   ]);
@@ -147,7 +147,7 @@ test("storage.onChanged: undefined は既定どおり有効扱い", () => {
   );
 
   assert.deepEqual(normalize(calls.slice(-3)), [
-    ["setPopup", { tabId: 10, popup: "popup.html" }],
+    ["setPopup", { tabId: 10, popup: "src/popup.html" }],
     ["setBadgeText", { tabId: 10, text: "ON" }],
     ["setBadgeBackgroundColor", { tabId: 10, color: "#d93025" }],
   ]);
