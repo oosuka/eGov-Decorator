@@ -243,6 +243,14 @@ test("buildHighlightFragmentWithDepth: 未閉じ開き括弧より前の確定�
   assert.deepEqual(highlighted, ["（A）"]);
 });
 
+test("buildHighlightFragmentWithDepth: 未対応の閉じ括弧はハイライトしない", () => {
+  const { context } = createContentContext();
+  const result = context.buildHighlightFragmentWithDepth("abc）def", 1, 0);
+  const highlighted = collectHighlightTexts(result.docFragment);
+
+  assert.deepEqual(highlighted, []);
+});
+
 test("括弧がノードをまたぐ: 安全コンテナ内では連結してハイライトされる", () => {
   const { context, FakeElement, FakeTextNode } = createContentContext();
 
@@ -283,7 +291,7 @@ test("括弧がノードをまたぐ: 安全コンテナ内でも未閉じ開き
   assert.deepEqual(collectHighlightTexts(root), []);
 });
 
-test("安全ガード: table 配下では未閉じ開き括弧をハイライトしない", () => {
+test("安全ガード: table 配下ではクロスノード処理しない", () => {
   const { context, FakeElement, FakeTextNode } = createContentContext();
 
   const root = new FakeElement("div");
@@ -325,6 +333,10 @@ test("getCrossNodeContainer: 安全/危険タグの判定", () => {
   table.appendChild(td);
   unsafeRoot.appendChild(table);
   assert.equal(context.getCrossNodeContainer(unsafeText), null);
+
+  const bodyOnlyText = new FakeTextNode("x");
+  bodyOnlyText.parentNode = context.document.body;
+  assert.equal(context.getCrossNodeContainer(bodyOnlyText), null);
 });
 
 test("collectDecoratableTextNodes: script/style と既存 highlight 内を除外", () => {
@@ -357,7 +369,7 @@ test("getStoredHighlightLevel: legacy decoratorEnabled=false は OFF", () => {
   assert.equal(context.getStoredHighlightLevel({ decoratorEnabled: false }), 4);
 });
 
-test("removeHighlightInRoot: 解除後に親ノードを normalize する", () => {
+test("removeHighlightInRoot: 同一親の複数spanでも normalize は1回だけ", () => {
   const { context } = createContentContext();
 
   let normalizeCalls = 0;
@@ -375,6 +387,34 @@ test("removeHighlightInRoot: 解除後に親ノードを normalize する", () =
 
   context.removeHighlightInRoot(root);
   assert.equal(normalizeCalls, 1);
+});
+
+test("removeHighlightInRoot: 親が異なる場合は親ごとに normalize する", () => {
+  const { context } = createContentContext();
+
+  let normalizeCallsA = 0;
+  let normalizeCallsB = 0;
+  const parentA = {
+    replaceChild: () => {},
+    normalize: () => {
+      normalizeCallsA += 1;
+    },
+  };
+  const parentB = {
+    replaceChild: () => {},
+    normalize: () => {
+      normalizeCallsB += 1;
+    },
+  };
+  const spanA = { parentNode: parentA, textContent: "（A）" };
+  const spanB = { parentNode: parentB, textContent: "（B）" };
+  const root = {
+    querySelectorAll: () => [spanA, spanB],
+  };
+
+  context.removeHighlightInRoot(root);
+  assert.equal(normalizeCallsA, 1);
+  assert.equal(normalizeCallsB, 1);
 });
 
 test("isDecoratorEnabled: false のみ無効、それ以外は有効", () => {

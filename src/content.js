@@ -339,7 +339,7 @@ function collectHighlightableTextNodes(root) {
 function getCrossNodeContainer(node) {
   let current = node && node.parentNode;
 
-  while (current && current !== document.body) {
+  while (current) {
     const tagName = current.nodeName && current.nodeName.toLowerCase();
     if (UNSAFE_CROSS_NODE_TAGS.has(tagName)) {
       return null;
@@ -347,10 +347,13 @@ function getCrossNodeContainer(node) {
     if (CROSS_NODE_CONTAINER_TAGS.has(tagName)) {
       return current;
     }
+    if (current === document.body) {
+      return null;
+    }
     current = current.parentNode;
   }
 
-  return document.body || null;
+  return null;
 }
 
 function applyHighlightInContainer(root, minHighlightDepth) {

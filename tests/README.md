@@ -56,8 +56,10 @@
   - 深さ1〜5（`minDepth=1..5`）の期待範囲検証
 - ノードまたぎ処理:
   - 安全コンテナ内での深さ持ち越し（例: `（` + `<a>...</a>` + `...）`）
+  - 安全コンテナが見つからない場合はクロスノード処理を行わないこと
   - 閉じ括弧で深さが戻ること
   - 安全コンテナ内でも未閉じ `（` はハイライトされないこと
+  - 未対応の閉じ括弧 `）` はハイライトされないこと
 - 安全ガード付きハイブリッド:
   - `table/tr/td/th` 配下でクロスノード持ち越ししないこと
   - table 配下で未閉じ `（` をハイライトしないこと
@@ -67,10 +69,10 @@
   - 既存 `.highlight` 内除外
 - 互換/安定化:
   - `getStoredHighlightLevel` の legacy マッピング
-  - `removeHighlightInRoot` 後の `normalize()` 実行
+  - `removeHighlightInRoot` 後の `normalize()` 実行（同一親は1回、複数親は親ごと）
   - `isDecoratorEnabled` の既定有効扱い
 
-現在の単体テスト件数は 33 件です（`npm run test`）。
+現在の単体テスト件数は 35 件です（`npm run test`）。
 
 ### `options.test.js`
 
