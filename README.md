@@ -47,7 +47,7 @@ e-Gov 法令ページ内の全角括弧 `（...）` をハイライト表示す�
 3. 「デフォルトに戻す」で既定値に戻す
 
 右クリックメニューの「オプション」は使用しない構成です。
-対象外ページではアイコンをクリックしてもポップアップは開きません。
+対象外ページでは「対象外のページです。」と表示されます。
 
 ### 4. ON/OFF 切り替え
 
@@ -93,9 +93,26 @@ e-Gov 法令ページ内の全角括弧 `（...）` をハイライト表示す�
 
 ## ファイル構成
 
-- `background.js`: ショートカット処理、バッジ更新、タブ/ウィンドウイベント監視
-- `content.js`: ハイライト適用、DOM 変化追従（`MutationObserver`）
-- `popup.html` + `options.js` + `options.css`: 色設定 UI
+- `src/background.js`: ショートカット処理、バッジ更新、タブ/ウィンドウイベント監視
+- `src/content.js`: ハイライト適用、DOM 変化追従（`MutationObserver`）
+- `src/popup.html` + `src/options.js` + `src/options.css`: 色設定 UI
+- `assets/icons/`: 拡張アイコン
+- `tests/`: `node:test` ベースの単体テスト
+
+## テスト実行
+
+```bash
+npm run test
+```
+
+## Lint / Format
+
+```bash
+npm run lint
+npm run lint:fix
+npm run format:check
+npm run format
+```
 
 ## セキュリティ
 

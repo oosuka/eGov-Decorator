@@ -1,0 +1,35 @@
+module.exports = {
+  root: true,
+  env: {
+    es2022: true,
+    browser: true,
+    node: true,
+  },
+  extends: ["eslint:recommended"],
+  ignorePatterns: ["assets/icons/**"],
+  overrides: [
+    {
+      files: ["src/background.js", "src/content.js", "src/options.js"],
+      env: {
+        browser: true,
+        node: false,
+      },
+      globals: {
+        chrome: "readonly",
+      },
+    },
+    {
+      files: ["tests/**/*.js"],
+      env: {
+        node: true,
+        browser: false,
+      },
+    },
+    {
+      files: [".eslintrc.cjs"],
+      env: {
+        node: true,
+      },
+    },
+  ],
+};
