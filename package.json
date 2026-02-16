@@ -1,0 +1,7 @@
+{
+  "name": "egov-decorator",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}

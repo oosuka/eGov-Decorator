@@ -96,6 +96,13 @@ e-Gov 法令ページ内の全角括弧 `（...）` をハイライト表示す�
 - `background.js`: ショートカット処理、バッジ更新、タブ/ウィンドウイベント監視
 - `content.js`: ハイライト適用、DOM 変化追従（`MutationObserver`）
 - `popup.html` + `options.js` + `options.css`: 色設定 UI
+- `tests/`: `node:test` ベースの単体テスト
+
+## テスト実行
+
+```bash
+npm run test
+```
 
 ## セキュリティ
 
