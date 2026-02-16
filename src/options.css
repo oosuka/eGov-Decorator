@@ -23,9 +23,26 @@ h1 {
   font-size: 20px;
 }
 
+h2 {
+  margin: 16px 0 8px;
+  font-size: 15px;
+}
+
 .description {
   margin: 0 0 20px;
   color: #4b5563;
+}
+
+.shortcut-intro {
+  margin-bottom: 8px;
+}
+
+.shortcut-lines .description {
+  margin-bottom: 8px;
+}
+
+.shortcut-lines .description:last-child {
+  margin-bottom: 0;
 }
 
 .field {
