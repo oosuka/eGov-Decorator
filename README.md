@@ -80,7 +80,7 @@ e-Gov 法令ページ内の全角括弧 `（...）` をハイライト表示す�
 - 文字色: `#ffffff`
 - 初回インストール時 ON
 
-## 確認チェック（Windows Chrome / Edge）
+## 確認チェック（Chrome / Edge）
 
 1. ツールバーで `e-Gov Decorator` をピン留め
 2. `https://laws.e-gov.go.jp/` または `https://elaws.e-gov.go.jp/` を開く
