@@ -4,6 +4,7 @@ const BADGE_TEXT_OFF = "OFF";
 const BADGE_BG_ON = "#d93025";
 const BADGE_BG_OFF = "#188038";
 const actionApi = chrome.action || chrome.browserAction;
+const badgeStateCache = new Map();
 
 function isTargetUrl(url) {
   return typeof url === "string" && TARGET_URL_PATTERN.test(url);
@@ -12,12 +13,16 @@ function isTargetUrl(url) {
 function setBadgeForTab(tabId, url, enabled) {
   if (tabId == null || !actionApi) return;
   const isTarget = isTargetUrl(url);
+  const nextBadgeState = isTarget ? (enabled ? "on" : "off") : "hidden";
+  if (badgeStateCache.get(tabId) === nextBadgeState) return;
+
   if (typeof actionApi.setPopup === "function") {
     actionApi.setPopup({ tabId, popup: isTarget ? "popup.html" : "" });
   }
 
   if (!isTarget) {
     actionApi.setBadgeText({ tabId, text: "" });
+    badgeStateCache.set(tabId, nextBadgeState);
     return;
   }
 
@@ -25,6 +30,7 @@ function setBadgeForTab(tabId, url, enabled) {
   const color = enabled ? BADGE_BG_ON : BADGE_BG_OFF;
   actionApi.setBadgeText({ tabId, text });
   actionApi.setBadgeBackgroundColor({ tabId, color });
+  badgeStateCache.set(tabId, nextBadgeState);
 }
 
 function withDecoratorEnabled(callback) {
@@ -96,9 +102,13 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     return;
   }
 
-  if (changeInfo.status === "complete") {
+  if (changeInfo.status === "complete" && tab && typeof tab.url === "string") {
     refreshBadgeForTab(tabId, tab && tab.url);
   }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  badgeStateCache.delete(tabId);
 });
 
 chrome.windows.onFocusChanged.addListener((windowId) => {
@@ -108,6 +118,8 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local" || !changes.decoratorEnabled) return;
-  const enabled = changes.decoratorEnabled.newValue !== false;
+  const { oldValue, newValue } = changes.decoratorEnabled;
+  if (oldValue === newValue) return;
+  const enabled = newValue !== false;
   refreshBadgeForAllTabs(enabled);
 });
