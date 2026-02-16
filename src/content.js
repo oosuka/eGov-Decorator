@@ -48,6 +48,17 @@ function applyColorChanges(changes) {
   }
 }
 
+function notifyContentReady() {
+  if (!chrome.runtime || typeof chrome.runtime.sendMessage !== "function") {
+    return;
+  }
+  try {
+    chrome.runtime.sendMessage({ type: "egov-content-ready" });
+  } catch {
+    // Ignore transient sendMessage failures when background is restarting.
+  }
+}
+
 // テキストノードを分解し、対応する全角括弧の範囲だけを span.highlight で包む
 function applyHighlightToNode(node) {
   let text = node.textContent;
@@ -233,6 +244,7 @@ function initializeDecorator() {
       applyHighlightColors(currentHighlightBgColor, currentHighlightTextColor);
       startObserverWhenReady();
       setDecoratorEnabled(decoratorEnabled);
+      notifyContentReady();
     },
   );
 }

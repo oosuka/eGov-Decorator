@@ -28,6 +28,7 @@ function createBackgroundHarness(options = {}) {
     onRemoved: createEvent(),
     onFocusChanged: createEvent(),
     onStorageChanged: createEvent(),
+    onMessage: createEvent(),
   };
 
   const state = {
@@ -51,6 +52,7 @@ function createBackgroundHarness(options = {}) {
     runtime: {
       onInstalled: events.onInstalled,
       onStartup: events.onStartup,
+      onMessage: events.onMessage,
       lastError: null,
     },
     tabs: {
@@ -89,6 +91,19 @@ test("isTargetUrl: laws/elaws のみ true", () => {
   assert.equal(context.isTargetUrl("https://laws.e-gov.go.jp/test"), true);
   assert.equal(context.isTargetUrl("https://elaws.e-gov.go.jp/test"), true);
   assert.equal(context.isTargetUrl("https://example.com/"), false);
+});
+
+test("初期化時: 保存状態を使って全タブのバッジを更新", () => {
+  const { calls } = createBackgroundHarness({
+    initialEnabled: true,
+    allTabs: [{ id: 20, url: "https://laws.e-gov.go.jp/a" }],
+  });
+
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 20, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 20, text: "ON" }],
+    ["setBadgeBackgroundColor", { tabId: 20, color: "#d93025" }],
+  ]);
 });
 
 test("setBadgeForTab: 対象URLは ON バッジを設定", () => {
@@ -150,5 +165,42 @@ test("storage.onChanged: undefined は既定どおり有効扱い", () => {
     ["setPopup", { tabId: 10, popup: "src/popup.html" }],
     ["setBadgeText", { tabId: 10, text: "ON" }],
     ["setBadgeBackgroundColor", { tabId: 10, color: "#d93025" }],
+  ]);
+});
+
+test("tabs.onUpdated: loading でキャッシュを破棄し complete で再描画", () => {
+  const { context, events, calls } = createBackgroundHarness();
+
+  context.setBadgeForTab(40, "https://laws.e-gov.go.jp/a", true);
+  events.onUpdated.emit(
+    40,
+    { status: "loading" },
+    { url: "https://laws.e-gov.go.jp/a" },
+  );
+  events.onUpdated.emit(
+    40,
+    { status: "complete" },
+    { url: "https://laws.e-gov.go.jp/a" },
+  );
+
+  assert.deepEqual(normalize(calls.slice(-3)), [
+    ["setPopup", { tabId: 40, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 40, text: "ON" }],
+    ["setBadgeBackgroundColor", { tabId: 40, color: "#d93025" }],
+  ]);
+});
+
+test("runtime.onMessage: content 初期化通知で送信元タブを更新", () => {
+  const { events, calls } = createBackgroundHarness();
+
+  events.onMessage.emit(
+    { type: "egov-content-ready" },
+    { tab: { id: 30, url: "https://laws.e-gov.go.jp/a" } },
+  );
+
+  assert.deepEqual(normalize(calls.slice(-3)), [
+    ["setPopup", { tabId: 30, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 30, text: "ON" }],
+    ["setBadgeBackgroundColor", { tabId: 30, color: "#d93025" }],
   ]);
 });

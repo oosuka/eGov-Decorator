@@ -72,6 +72,17 @@ function refreshBadgeForAllTabs(enabled) {
   });
 }
 
+function refreshBadgeForAllTabsFromStorage() {
+  withDecoratorEnabled(refreshBadgeForAllTabs);
+}
+
+function handleContentReadyMessage(message, sender) {
+  if (!message || message.type !== "egov-content-ready") return;
+  const senderTab = sender && sender.tab;
+  if (!senderTab || senderTab.id == null) return;
+  refreshBadgeForTab(senderTab.id, senderTab.url);
+}
+
 chrome.commands.onCommand.addListener((command) => {
   if (command === "toggle-decorator") {
     chrome.storage.local.get([DECORATOR_ENABLED_KEY], (result) => {
@@ -89,7 +100,7 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  withDecoratorEnabled(refreshBadgeForAllTabs);
+  refreshBadgeForAllTabsFromStorage();
 });
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
@@ -100,6 +111,10 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === "loading") {
+    badgeStateCache.delete(tabId);
+  }
+
   if (typeof changeInfo.url === "string") {
     refreshBadgeForTab(tabId, changeInfo.url);
     return;
@@ -126,3 +141,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   const enabled = isDecoratorEnabled(newValue);
   refreshBadgeForAllTabs(enabled);
 });
+
+chrome.runtime.onMessage.addListener((message, sender) => {
+  handleContentReadyMessage(message, sender);
+});
+
+// Ensure popup/badge state is initialized even when the service worker is reloaded mid-session.
+refreshBadgeForAllTabsFromStorage();
