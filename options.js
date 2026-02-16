@@ -1,28 +1,39 @@
 const DEFAULT_BG_COLOR = "#e6e6e6";
 const DEFAULT_TEXT_COLOR = "#ffffff";
+const HIGHLIGHT_BG_COLOR_KEY = "highlightBgColor";
+const HIGHLIGHT_TEXT_COLOR_KEY = "highlightTextColor";
+const STATUS_CLEAR_DELAY_MS = 1500;
+
+function byId(id) {
+  return document.getElementById(id);
+}
+
+function getColorOrDefault(value, defaultColor) {
+  return value || defaultColor;
+}
 
 function showStatus(message) {
-  const status = document.getElementById("status");
+  const status = byId("status");
   status.textContent = message;
   window.setTimeout(() => {
     if (status.textContent === message) {
       status.textContent = "";
     }
-  }, 1500);
+  }, STATUS_CLEAR_DELAY_MS);
 }
 
 function setInputs(bgColor, textColor) {
-  document.getElementById("bgColor").value = bgColor;
-  document.getElementById("textColor").value = textColor;
+  byId("bgColor").value = bgColor;
+  byId("textColor").value = textColor;
 }
 
 function loadSettings() {
   chrome.storage.local.get(
-    ["highlightBgColor", "highlightTextColor"],
+    [HIGHLIGHT_BG_COLOR_KEY, HIGHLIGHT_TEXT_COLOR_KEY],
     (result) => {
       setInputs(
-        result.highlightBgColor || DEFAULT_BG_COLOR,
-        result.highlightTextColor || DEFAULT_TEXT_COLOR,
+        getColorOrDefault(result.highlightBgColor, DEFAULT_BG_COLOR),
+        getColorOrDefault(result.highlightTextColor, DEFAULT_TEXT_COLOR),
       );
     },
   );
@@ -31,8 +42,8 @@ function loadSettings() {
 function saveSettings(bgColor, textColor) {
   chrome.storage.local.set(
     {
-      highlightBgColor: bgColor,
-      highlightTextColor: textColor,
+      [HIGHLIGHT_BG_COLOR_KEY]: bgColor,
+      [HIGHLIGHT_TEXT_COLOR_KEY]: textColor,
     },
     () => {
       showStatus("保存しました");
@@ -41,15 +52,15 @@ function saveSettings(bgColor, textColor) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("color-form");
-  const resetBtn = document.getElementById("resetBtn");
+  const form = byId("color-form");
+  const resetBtn = byId("resetBtn");
 
   loadSettings();
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    const bgColor = document.getElementById("bgColor").value;
-    const textColor = document.getElementById("textColor").value;
+    const bgColor = byId("bgColor").value;
+    const textColor = byId("textColor").value;
     saveSettings(bgColor, textColor);
   });
 

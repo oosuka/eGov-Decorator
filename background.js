@@ -1,4 +1,5 @@
 const TARGET_URL_PATTERN = /^https:\/\/(?:elaws|laws)\.e-gov\.go\.jp\//;
+const DECORATOR_ENABLED_KEY = "decoratorEnabled";
 const BADGE_TEXT_ON = "ON";
 const BADGE_TEXT_OFF = "OFF";
 const BADGE_BG_ON = "#d93025";
@@ -8,6 +9,14 @@ const badgeStateCache = new Map();
 
 function isTargetUrl(url) {
   return typeof url === "string" && TARGET_URL_PATTERN.test(url);
+}
+
+function isDecoratorEnabled(value) {
+  return value !== false;
+}
+
+function getStoredDecoratorEnabled(result) {
+  return isDecoratorEnabled(result[DECORATOR_ENABLED_KEY]);
 }
 
 function setBadgeForTab(tabId, url, enabled) {
@@ -34,9 +43,9 @@ function setBadgeForTab(tabId, url, enabled) {
 }
 
 function withDecoratorEnabled(callback) {
-  chrome.storage.local.get(["decoratorEnabled"], (result) => {
+  chrome.storage.local.get([DECORATOR_ENABLED_KEY], (result) => {
     // Treat any value other than explicit false (including undefined / missing) as enabled by default.
-    callback(result.decoratorEnabled !== false);
+    callback(getStoredDecoratorEnabled(result));
   });
 }
 
@@ -63,17 +72,11 @@ function refreshBadgeForAllTabs(enabled) {
   });
 }
 
-function refreshBadgeForAllTabsFromStorage() {
-  withDecoratorEnabled((enabled) => {
-    refreshBadgeForAllTabs(enabled);
-  });
-}
-
 chrome.commands.onCommand.addListener((command) => {
   if (command === "toggle-decorator") {
-    chrome.storage.local.get(["decoratorEnabled"], (result) => {
-      const newStatus = !(result.decoratorEnabled !== false);
-      chrome.storage.local.set({ decoratorEnabled: newStatus }, () => {
+    chrome.storage.local.get([DECORATOR_ENABLED_KEY], (result) => {
+      const newStatus = !getStoredDecoratorEnabled(result);
+      chrome.storage.local.set({ [DECORATOR_ENABLED_KEY]: newStatus }, () => {
         refreshBadgeForAllTabs(newStatus);
       });
     });
@@ -81,18 +84,18 @@ chrome.commands.onCommand.addListener((command) => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.set({ decoratorEnabled: true });
+  chrome.storage.local.set({ [DECORATOR_ENABLED_KEY]: true });
   refreshBadgeForAllTabs(true);
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  refreshBadgeForAllTabsFromStorage();
+  withDecoratorEnabled(refreshBadgeForAllTabs);
 });
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
   chrome.tabs.get(activeInfo.tabId, (tab) => {
     if (chrome.runtime.lastError) return;
-    refreshBadgeForTab(activeInfo.tabId, tab && tab.url);
+    refreshBadgeForTab(activeInfo.tabId, tab?.url);
   });
 });
 
@@ -103,7 +106,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 
   if (changeInfo.status === "complete" && tab && typeof tab.url === "string") {
-    refreshBadgeForTab(tabId, tab && tab.url);
+    refreshBadgeForTab(tabId, tab.url);
   }
 });
 
@@ -117,9 +120,9 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "local" || !changes.decoratorEnabled) return;
-  const { oldValue, newValue } = changes.decoratorEnabled;
+  if (areaName !== "local" || !changes[DECORATOR_ENABLED_KEY]) return;
+  const { oldValue, newValue } = changes[DECORATOR_ENABLED_KEY];
   if (oldValue === newValue) return;
-  const enabled = newValue !== false;
+  const enabled = isDecoratorEnabled(newValue);
   refreshBadgeForAllTabs(enabled);
 });

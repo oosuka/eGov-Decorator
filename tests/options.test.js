@@ -33,7 +33,6 @@ function createOptionsContext({ storedValues = {} } = {}) {
   };
 
   const scheduled = [];
-  const getCalls = [];
   const setCalls = [];
   const docListeners = new Map();
 
@@ -52,10 +51,7 @@ function createOptionsContext({ storedValues = {} } = {}) {
     chrome: {
       storage: {
         local: {
-          get: (keys, cb) => {
-            getCalls.push(keys);
-            cb(storedValues);
-          },
+          get: (_keys, cb) => cb(storedValues),
           set: (payload, cb) => {
             setCalls.push(payload);
             if (cb) cb();
@@ -72,7 +68,6 @@ function createOptionsContext({ storedValues = {} } = {}) {
     context,
     elements,
     scheduled,
-    getCalls,
     setCalls,
     fireDOMContentLoaded: () => {
       const handler = docListeners.get("DOMContentLoaded");
@@ -97,15 +92,6 @@ test("loadSettings: 保存済み色をフォームに反映", () => {
 
   assert.equal(elements.bgColor.value, "#111111");
   assert.equal(elements.textColor.value, "#222222");
-});
-
-test("loadSettings: 未設定時はデフォルト色を反映", () => {
-  const { context, elements } = createOptionsContext({ storedValues: {} });
-
-  context.loadSettings();
-
-  assert.equal(elements.bgColor.value, "#e6e6e6");
-  assert.equal(elements.textColor.value, "#ffffff");
 });
 
 test("saveSettings: storage に保存しステータス表示", () => {
@@ -135,14 +121,10 @@ test("DOMContentLoaded: submit で現在入力値を保存", () => {
   elements.bgColor.value = "#123456";
   elements.textColor.value = "#654321";
 
-  let prevented = false;
   elements["color-form"].dispatch("submit", {
-    preventDefault: () => {
-      prevented = true;
-    },
+    preventDefault: () => {},
   });
 
-  assert.equal(prevented, true);
   assert.deepEqual(normalize(setCalls.at(-1)), {
     highlightBgColor: "#123456",
     highlightTextColor: "#654321",

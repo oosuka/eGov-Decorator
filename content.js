@@ -8,8 +8,45 @@ function createHighlightedElement(text) {
 const BRACKET_PATTERN = /（.*?）/;
 const DEFAULT_BG_COLOR = "#e6e6e6";
 const DEFAULT_TEXT_COLOR = "#ffffff";
+const DECORATOR_ENABLED_KEY = "decoratorEnabled";
+const HIGHLIGHT_BG_COLOR_KEY = "highlightBgColor";
+const HIGHLIGHT_TEXT_COLOR_KEY = "highlightTextColor";
 let currentHighlightBgColor = DEFAULT_BG_COLOR;
 let currentHighlightTextColor = DEFAULT_TEXT_COLOR;
+
+function getColorOrDefault(value, defaultColor) {
+  return value || defaultColor;
+}
+
+function getStoredColor(result, key, defaultColor) {
+  return getColorOrDefault(result[key], defaultColor);
+}
+
+function isDecoratorEnabled(value) {
+  return value !== false;
+}
+
+function applyColorChanges(changes) {
+  let shouldUpdateColors = false;
+
+  if (changes[HIGHLIGHT_BG_COLOR_KEY]) {
+    currentHighlightBgColor = getColorOrDefault(
+      changes[HIGHLIGHT_BG_COLOR_KEY].newValue,
+      DEFAULT_BG_COLOR,
+    );
+    shouldUpdateColors = true;
+  }
+  if (changes[HIGHLIGHT_TEXT_COLOR_KEY]) {
+    currentHighlightTextColor = getColorOrDefault(
+      changes[HIGHLIGHT_TEXT_COLOR_KEY].newValue,
+      DEFAULT_TEXT_COLOR,
+    );
+    shouldUpdateColors = true;
+  }
+  if (shouldUpdateColors) {
+    applyHighlightColors(currentHighlightBgColor, currentHighlightTextColor);
+  }
+}
 
 // テキストノードを分解し、対応する全角括弧の範囲だけを span.highlight で包む
 function applyHighlightToNode(node) {
@@ -180,12 +217,19 @@ function startObserverWhenReady() {
 function initializeDecorator() {
   // storage は初期化時に1回だけ読み込み、以降はメモリ状態を参照する
   chrome.storage.local.get(
-    ["decoratorEnabled", "highlightBgColor", "highlightTextColor"],
+    [DECORATOR_ENABLED_KEY, HIGHLIGHT_BG_COLOR_KEY, HIGHLIGHT_TEXT_COLOR_KEY],
     (result) => {
-      decoratorEnabled = result.decoratorEnabled !== false;
-      currentHighlightBgColor = result.highlightBgColor || DEFAULT_BG_COLOR;
-      currentHighlightTextColor =
-        result.highlightTextColor || DEFAULT_TEXT_COLOR;
+      decoratorEnabled = isDecoratorEnabled(result[DECORATOR_ENABLED_KEY]);
+      currentHighlightBgColor = getStoredColor(
+        result,
+        HIGHLIGHT_BG_COLOR_KEY,
+        DEFAULT_BG_COLOR,
+      );
+      currentHighlightTextColor = getStoredColor(
+        result,
+        HIGHLIGHT_TEXT_COLOR_KEY,
+        DEFAULT_TEXT_COLOR,
+      );
       applyHighlightColors(currentHighlightBgColor, currentHighlightTextColor);
       startObserverWhenReady();
       setDecoratorEnabled(decoratorEnabled);
@@ -206,20 +250,12 @@ if (document.readyState === "loading") {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
 
-  if (changes.highlightBgColor || changes.highlightTextColor) {
-    if (changes.highlightBgColor) {
-      currentHighlightBgColor =
-        changes.highlightBgColor.newValue || DEFAULT_BG_COLOR;
-    }
-    if (changes.highlightTextColor) {
-      currentHighlightTextColor =
-        changes.highlightTextColor.newValue || DEFAULT_TEXT_COLOR;
-    }
-    applyHighlightColors(currentHighlightBgColor, currentHighlightTextColor);
-  }
+  applyColorChanges(changes);
 
-  if (changes.decoratorEnabled) {
-    const nextValue = !!changes.decoratorEnabled.newValue;
+  if (changes[DECORATOR_ENABLED_KEY]) {
+    const nextValue = isDecoratorEnabled(
+      changes[DECORATOR_ENABLED_KEY].newValue,
+    );
     if (nextValue !== decoratorEnabled) {
       setDecoratorEnabled(nextValue);
     }

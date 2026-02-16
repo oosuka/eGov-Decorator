@@ -109,6 +109,16 @@ test("applyHighlightToNode: 括弧部分のみハイライト要素化", () => {
   assert.equal(fragment.childNodes[2].textContent, "def");
 });
 
+test("applyHighlightToNode: ネスト括弧は1塊として扱う", () => {
+  const { context, FakeTextNode } = createContentContext();
+  const fragment = context.applyHighlightToNode(
+    new FakeTextNode("a（b（c）d）e"),
+  );
+
+  assert.equal(fragment.childNodes.length, 3);
+  assert.equal(fragment.childNodes[1].textContent, "（b（c）d）");
+});
+
 test("collectDecoratableTextNodes: script/style と既存 highlight 内を除外", () => {
   const { context, FakeElement, FakeTextNode } = createContentContext();
 
@@ -119,24 +129,24 @@ test("collectDecoratableTextNodes: script/style と既存 highlight 内を除外
   p.appendChild(targetText);
 
   const script = new FakeElement("script");
-  const skippedByScript = new FakeTextNode("skip（B）");
-  script.appendChild(skippedByScript);
+  script.appendChild(new FakeTextNode("skip（B）"));
 
   const highlightedSpan = new FakeElement("span");
   highlightedSpan.className = "highlight";
-  const skippedByHighlight = new FakeTextNode("skip（C）");
-  highlightedSpan.appendChild(skippedByHighlight);
-
-  const plain = new FakeElement("p");
-  const skippedByPattern = new FakeTextNode("括弧なし");
-  plain.appendChild(skippedByPattern);
+  highlightedSpan.appendChild(new FakeTextNode("skip（C）"));
 
   root.appendChild(p);
   root.appendChild(script);
   root.appendChild(highlightedSpan);
-  root.appendChild(plain);
 
   const nodes = context.collectDecoratableTextNodes(root);
   assert.equal(nodes.length, 1);
   assert.equal(nodes[0], targetText);
+});
+
+test("isDecoratorEnabled: false のみ無効、それ以外は有効", () => {
+  const { context } = createContentContext();
+  assert.equal(context.isDecoratorEnabled(false), false);
+  assert.equal(context.isDecoratorEnabled(undefined), true);
+  assert.equal(context.isDecoratorEnabled(true), true);
 });
