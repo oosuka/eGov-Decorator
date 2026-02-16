@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>e-Gov Decorator</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body class="popup">
+  <main class="container">
+    <h1>e-Gov Decorator 設定</h1>
+    <p class="description">ハイライトの背景色と文字色を設定できます。</p>
+
+    <form id="color-form">
+      <label class="field" for="bgColor">
+        <span>背景色</span>
+        <input id="bgColor" name="bgColor" type="color">
+      </label>
+
+      <label class="field" for="textColor">
+        <span>文字色</span>
+        <input id="textColor" name="textColor" type="color">
+      </label>
+
+      <div class="actions">
+        <button type="submit">保存</button>
+        <button type="button" id="resetBtn">デフォルトに戻す</button>
+      </div>
+    </form>
+
+    <p id="status" class="status" aria-live="polite"></p>
+  </main>
+
+  <script src="options.js"></script>
+</body>
+</html>

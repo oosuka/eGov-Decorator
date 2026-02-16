@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "e-Gov Decorator",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Decorate brackets on e-Gov laws pages",
   "content_scripts": [
     {
@@ -10,15 +10,23 @@
       "css": ["style.css"]
     }
   ],
-  "permissions": ["storage"],
+  "permissions": ["storage", "tabs"],
   "background": {
     "service_worker": "background.js"
   },
-  "options_page": "options.html",
+  "action": {
+    "default_title": "e-Gov Decorator",
+    "default_icon": {
+      "32": "images/icon32.png",
+      "64": "images/icon64.png",
+      "128": "images/icon128.png"
+    }
+  },
   "commands": {
     "toggle-decorator": {
       "suggested_key": {
-        "default": "Ctrl+Shift+Y"
+        "default": "Ctrl+Shift+X",
+        "mac": "Command+Shift+X"
       },
       "description": "Toggle e-Gov Decorator"
     }
