@@ -177,13 +177,6 @@ if (document.readyState === 'loading') {
   initializeDecorator();
 }
 
-// メッセージ受信時は現在の状態を再適用だけ行う（状態変更は storage.onChanged を正とする）
-chrome.runtime.onMessage.addListener((message) => {
-  if (message.action === 'toggle-decorator') {
-    setDecoratorEnabled(decoratorEnabled);
-  }
-});
-
 // storage 変更時のみメモリ状態を更新して反映
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
