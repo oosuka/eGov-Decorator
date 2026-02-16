@@ -122,7 +122,7 @@ test("setBadgeForTab: 対象外URLはバッジを消す", () => {
   context.setBadgeForTab(9, "https://example.com/", true);
 
   assert.deepEqual(normalize(calls), [
-    ["setPopup", { tabId: 9, popup: "" }],
+    ["setPopup", { tabId: 9, popup: "src/popup-disabled.html" }],
     ["setBadgeText", { tabId: 9, text: "" }],
   ]);
 });

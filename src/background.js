@@ -26,7 +26,10 @@ function setBadgeForTab(tabId, url, enabled) {
   if (badgeStateCache.get(tabId) === nextBadgeState) return;
 
   if (typeof actionApi.setPopup === "function") {
-    actionApi.setPopup({ tabId, popup: isTarget ? "src/popup.html" : "" });
+    actionApi.setPopup({
+      tabId,
+      popup: isTarget ? "src/popup.html" : "src/popup-disabled.html",
+    });
   }
 
   if (!isTarget) {
