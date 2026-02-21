@@ -1,4 +1,5 @@
 const TARGET_URL_PATTERN = /^https:\/\/(?:elaws|laws)\.e-gov\.go\.jp\/law\//;
+const EGOV_DOMAIN_URL_PATTERN = /^https:\/\/(?:elaws|laws)\.e-gov\.go\.jp\//;
 const DECORATOR_ENABLED_KEY = "decoratorEnabled";
 const HIGHLIGHT_LEVEL_KEY = "highlightLevel";
 const DEFAULT_HIGHLIGHT_LEVEL = 0;
@@ -18,6 +19,10 @@ const ACTION_API_ERROR_PREFIX = "[e-Gov Decorator] action API call failed:";
 
 function isTargetUrl(url) {
   return typeof url === "string" && TARGET_URL_PATTERN.test(url);
+}
+
+function isEgovDomainUrl(url) {
+  return typeof url === "string" && EGOV_DOMAIN_URL_PATTERN.test(url);
 }
 
 function isDecoratorEnabled(value) {
@@ -186,6 +191,7 @@ function requestContentSyncForTab(tabId, url) {
   if (
     tabId == null ||
     typeof url !== "string" ||
+    !isEgovDomainUrl(url) ||
     !chrome.tabs ||
     typeof chrome.tabs.sendMessage !== "function"
   ) {

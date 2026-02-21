@@ -341,6 +341,28 @@ test("tabs.onUpdated: 対象外URLでも content 再同期メッセージを送�
   );
 });
 
+test("tabs.onUpdated: e-Govドメイン外URLでは content 再同期メッセージを送らない", () => {
+  const { events, calls } = createBackgroundHarness({
+    initialHighlightLevel: 0,
+  });
+
+  events.onUpdated.emit(
+    34,
+    { url: "https://example.com/path" },
+    { url: "https://example.com/path" },
+  );
+
+  assert.equal(
+    normalize(calls).some(
+      (entry) =>
+        entry[0] === "sendMessage" &&
+        entry[1].tabId === 34 &&
+        entry[1].message.type === "egov-force-sync",
+    ),
+    false,
+  );
+});
+
 test("tabs.onUpdated: 同一URLへの再同期メッセージは重複送信しない", () => {
   const { events, calls } = createBackgroundHarness({
     initialHighlightLevel: 0,

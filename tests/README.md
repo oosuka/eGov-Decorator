@@ -42,6 +42,7 @@
 - タブ/メッセージ連動:
   - `tabs.onUpdated`（loading -> complete）で再描画
   - `tabs.onUpdated` の URL 更新で content 再同期メッセージ送信（対象/非対象の両方、同一URL重複送信は抑止）
+  - `tabs.onUpdated` の URL 更新で e-Gov ドメイン外には再同期メッセージを送信しない
   - `runtime.onMessage`（content ready）で送信元タブ更新
 - 耐障害性:
   - 閉じたタブに対する action API の `No tab with id` Promise reject を無視して未処理例外を回避
@@ -78,7 +79,7 @@
   - `isDecoratorEnabled` の既定有効扱い
   - 非対象URLで `setHighlightLevel` が DOM を変更しないこと
 
-現在の単体テスト件数は 42 件です（`npm run test`）。
+現在の単体テスト件数は 43 件です（`npm run test`）。
 
 ### `options.test.js`
 

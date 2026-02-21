@@ -540,7 +540,7 @@ const observer = new MutationObserver(() => {
 });
 
 function getObserverRoot() {
-  return document.documentElement || document.body || null;
+  return document.body || null;
 }
 
 function startObserverWhenReady(onReady) {
@@ -658,8 +658,7 @@ function initializeDecorator() {
         DEFAULT_TEXT_COLOR,
       );
       applyHighlightColors(currentHighlightBgColor, currentHighlightTextColor);
-      lastKnownUrl = getCurrentHref();
-      syncDecoratorByUrl();
+      syncDecoratorByUrl(true);
     },
   );
 }
