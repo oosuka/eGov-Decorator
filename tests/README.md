@@ -44,6 +44,8 @@
   - `runtime.onMessage`（content ready）で送信元タブ更新
 - 耐障害性:
   - 閉じたタブに対する action API の `No tab with id` Promise reject を無視して未処理例外を回避
+  - `No tab with id` 以外の Promise reject は `console.error` で処理
+  - 同期 throw の `No tab with id` でもキャッシュ不整合が残らないことを検証
 
 ### `content.test.js`
 
@@ -74,7 +76,7 @@
   - `removeHighlightInRoot` 後の `normalize()` 実行（同一親は1回、複数親は親ごと）
   - `isDecoratorEnabled` の既定有効扱い
 
-現在の単体テスト件数は 36 件です（`npm run test`）。
+現在の単体テスト件数は 38 件です（`npm run test`）。
 
 ### `options.test.js`
 
