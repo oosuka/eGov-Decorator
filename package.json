@@ -1,31 +1,36 @@
 {
   "name": "egov-decorator",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "scripts": {
     "test": "node --test",
     "check": "node --check src/content.js && node --check src/background.js && node --check src/options.js",
-    "lint": "eslint \".eslintrc.cjs\" \"src/**/*.js\" \"tests/**/*.js\"",
-    "lint:fix": "eslint \".eslintrc.cjs\" \"src/**/*.js\" \"tests/**/*.js\" --fix",
+    "lint": "eslint \"src/**/*.js\" \"tests/**/*.js\" \"eslint.config.js\" --max-warnings 0",
+    "lint:fix": "eslint \"src/**/*.js\" \"tests/**/*.js\" \"eslint.config.js\" --fix --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "ci:check": "npm run check && npm run lint && npm run format:check && npm test",
     "prepare": "husky install"
   },
   "devDependencies": {
-    "eslint": "^8.57.1",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.1",
+    "globals": "^17.3.0",
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.0",
-    "prettier": "^3.5.3"
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1"
   },
   "lint-staged": {
-    "*.{js,cjs,mjs,json,md}": [
+    "*.{js,cjs,mjs}": [
+      "eslint --fix --max-warnings 0",
       "prettier --write"
     ],
-    "src/**/*.js": [
-      "eslint --fix"
-    ],
-    "tests/**/*.js": [
-      "eslint --fix"
+    "*.{json,md,css,html}": [
+      "prettier --write"
     ]
+  },
+  "volta": {
+    "node": "24.13.1",
+    "npm": "11.10.1"
   }
 }

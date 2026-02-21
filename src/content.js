@@ -128,21 +128,23 @@ function buildHighlightFragmentWithDepth(
   minHighlightDepth,
   initialDepth,
 ) {
-  const docFragment = document.createDocumentFragment();
   if (!text || text.length === 0) {
-    return { docFragment, endDepth: initialDepth, hasHighlight: false };
+    return {
+      docFragment: document.createDocumentFragment(),
+      endDepth: initialDepth,
+      hasHighlight: false,
+    };
   }
 
   let depth = initialDepth;
   const highlightByIndex = new Array(text.length).fill(false);
   const localOpenPositions = [];
-  let hasHighlight = false;
 
-  function shouldHighlightChar(char, index) {
+  function shouldHighlightChar(char, position) {
     if (char === "（") {
       depth += 1;
       if (initialDepth === 0) {
-        localOpenPositions.push(index);
+        localOpenPositions.push(position);
       }
       return depth >= minHighlightDepth;
     }
@@ -173,37 +175,11 @@ function buildHighlightFragmentWithDepth(
     }
   }
 
-  let segmentStart = 0;
-  let currentSegmentHighlighted = highlightByIndex[0];
-  if (currentSegmentHighlighted) hasHighlight = true;
-
-  for (let i = 1; i < text.length; i++) {
-    const shouldHighlight = highlightByIndex[i];
-    if (shouldHighlight !== currentSegmentHighlighted) {
-      appendSegment(
-        docFragment,
-        text.slice(segmentStart, i),
-        currentSegmentHighlighted,
-      );
-      segmentStart = i;
-      currentSegmentHighlighted = shouldHighlight;
-      if (shouldHighlight) {
-        hasHighlight = true;
-      }
-    }
-  }
-
-  appendSegment(
-    docFragment,
-    text.slice(segmentStart),
-    currentSegmentHighlighted,
+  const { docFragment: maskedFragment, hasHighlight } = buildFragmentFromMask(
+    text,
+    highlightByIndex,
   );
-
-  if (currentSegmentHighlighted) {
-    hasHighlight = true;
-  }
-
-  return { docFragment, endDepth: depth, hasHighlight };
+  return { docFragment: maskedFragment, endDepth: depth, hasHighlight };
 }
 
 // テキストノードを分解し、指定ネスト階層以降のみ span.highlight で包む
@@ -298,6 +274,10 @@ function fragmentHasHighlight(fragment) {
   );
 }
 
+function shouldSkipTextNodeByParentName(parentName) {
+  return parentName === "script" || parentName === "style";
+}
+
 function isInsideHighlightElement(node) {
   let current = node && node.parentNode;
   while (current) {
@@ -307,6 +287,18 @@ function isInsideHighlightElement(node) {
     current = current.parentNode;
   }
   return false;
+}
+
+function isHighlightableTextNode(node) {
+  const parent = node && node.parentNode;
+  if (!parent) return false;
+
+  const parentName = parent.nodeName.toLowerCase();
+  if (shouldSkipTextNodeByParentName(parentName)) {
+    return false;
+  }
+
+  return !isInsideHighlightElement(node);
 }
 
 function collectHighlightableTextNodes(root) {
@@ -322,15 +314,9 @@ function collectHighlightableTextNodes(root) {
   let node;
 
   while ((node = walker.nextNode())) {
-    const parent = node.parentNode;
-    if (!parent) continue;
-
-    const parentName = parent.nodeName.toLowerCase();
-    const isValidParent = !["script", "style"].includes(parentName);
-    if (!isValidParent || isInsideHighlightElement(node)) {
-      continue;
+    if (isHighlightableTextNode(node)) {
+      nodes.push(node);
     }
-    nodes.push(node);
   }
 
   return nodes;
@@ -357,11 +343,14 @@ function getCrossNodeContainer(node) {
 }
 
 function applyHighlightInContainer(root, minHighlightDepth) {
-  if (collectDecoratableTextNodes(root).length === 0) {
+  const nodes = collectHighlightableTextNodes(root);
+  if (nodes.length === 0) {
+    return;
+  }
+  if (collectDecoratableTextNodes(nodes).length === 0) {
     return;
   }
 
-  const nodes = collectHighlightableTextNodes(root);
   const groupedByContainer = new Map();
 
   nodes.forEach((node) => {
@@ -371,6 +360,9 @@ function applyHighlightInContainer(root, minHighlightDepth) {
     const container = getCrossNodeContainer(node);
     const isCrossNodeEnabled = !!container;
     if (!isCrossNodeEnabled) {
+      if (!BRACKET_PATTERN.test(node.nodeValue || "")) {
+        return;
+      }
       const highlightedContent = applyHighlightToNode(node, minHighlightDepth);
       if (fragmentHasHighlight(highlightedContent)) {
         parent.replaceChild(highlightedContent, node);
@@ -387,6 +379,9 @@ function applyHighlightInContainer(root, minHighlightDepth) {
   groupedByContainer.forEach((containerNodes) => {
     const texts = containerNodes.map((node) => node.textContent || "");
     const joinedText = texts.join("");
+    if (!BRACKET_PATTERN.test(joinedText)) {
+      return;
+    }
     const highlightMask = computeMatchedHighlightMask(
       joinedText,
       minHighlightDepth,
@@ -413,36 +408,11 @@ function applyHighlightInContainer(root, minHighlightDepth) {
   });
 }
 
-function collectDecoratableTextNodes(root) {
-  if (!root) return [];
-
-  const walker = document.createTreeWalker(
-    root,
-    NodeFilter.SHOW_TEXT,
-    null,
-    false,
-  );
-  const nodes = [];
-  let node;
-
-  while ((node = walker.nextNode())) {
-    const parent = node.parentNode;
-    if (!parent) continue;
-
-    const parentName = parent.nodeName.toLowerCase();
-    const isValidParent = !["script", "style"].includes(parentName);
-    const isAlreadyHighlighted =
-      parent.classList && parent.classList.contains("highlight");
-    if (
-      isValidParent &&
-      !isAlreadyHighlighted &&
-      BRACKET_PATTERN.test(node.nodeValue)
-    ) {
-      nodes.push(node);
-    }
-  }
-
-  return nodes;
+function collectDecoratableTextNodes(rootOrNodes) {
+  const nodes = Array.isArray(rootOrNodes)
+    ? rootOrNodes
+    : collectHighlightableTextNodes(rootOrNodes);
+  return nodes.filter((node) => BRACKET_PATTERN.test(node.nodeValue || ""));
 }
 
 function applyHighlightInRoot(root) {

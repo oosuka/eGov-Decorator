@@ -32,11 +32,15 @@ function loadSettings() {
     [HIGHLIGHT_BG_COLOR_KEY, HIGHLIGHT_TEXT_COLOR_KEY],
     (result) => {
       setInputs(
-        getColorOrDefault(result.highlightBgColor, DEFAULT_BG_COLOR),
-        getColorOrDefault(result.highlightTextColor, DEFAULT_TEXT_COLOR),
+        getStoredColor(result, HIGHLIGHT_BG_COLOR_KEY, DEFAULT_BG_COLOR),
+        getStoredColor(result, HIGHLIGHT_TEXT_COLOR_KEY, DEFAULT_TEXT_COLOR),
       );
     },
   );
+}
+
+function getStoredColor(result, key, defaultColor) {
+  return getColorOrDefault(result[key], defaultColor);
 }
 
 function saveSettings(bgColor, textColor) {
@@ -54,13 +58,15 @@ function saveSettings(bgColor, textColor) {
 document.addEventListener("DOMContentLoaded", () => {
   const form = byId("color-form");
   const resetBtn = byId("resetBtn");
+  const bgColorInput = byId("bgColor");
+  const textColorInput = byId("textColor");
 
   loadSettings();
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    const bgColor = byId("bgColor").value;
-    const textColor = byId("textColor").value;
+    const bgColor = bgColorInput.value;
+    const textColor = textColorInput.value;
     saveSettings(bgColor, textColor);
   });
 
