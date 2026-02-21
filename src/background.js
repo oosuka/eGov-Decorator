@@ -74,17 +74,15 @@ function runActionApiCall(tabId, fn) {
     const maybePromise = fn();
     if (maybePromise && typeof maybePromise.catch === "function") {
       maybePromise.catch((error) => {
-        if (isNoTabWithIdError(error)) {
-          badgeStateCache.delete(tabId);
-          return;
-        }
+        badgeStateCache.delete(tabId);
+        if (isNoTabWithIdError(error)) return;
         console.error(ACTION_API_ERROR_PREFIX, error);
       });
     }
     return true;
   } catch (error) {
+    badgeStateCache.delete(tabId);
     if (isNoTabWithIdError(error)) {
-      badgeStateCache.delete(tabId);
       return false;
     }
     console.error(ACTION_API_ERROR_PREFIX, error);

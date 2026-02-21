@@ -429,13 +429,26 @@ test("setBadgeForTab: 閉じたタブの Promise reject(No tab with id) を無�
 
 test("setBadgeForTab: No tab with id 以外の Promise reject は console.error で処理する", async () => {
   const errors = [];
+  const calls = [];
   const actionApi = {
-    setPopup: (payload) =>
-      Promise.reject(new Error(`Unexpected error for tab ${payload.tabId}`)),
-    setBadgeText: (payload) =>
-      Promise.reject(new Error(`Unexpected error for tab ${payload.tabId}`)),
-    setBadgeBackgroundColor: (payload) =>
-      Promise.reject(new Error(`Unexpected error for tab ${payload.tabId}`)),
+    setPopup: (payload) => {
+      calls.push(["setPopup", payload]);
+      return Promise.reject(
+        new Error(`Unexpected error for tab ${payload.tabId}`),
+      );
+    },
+    setBadgeText: (payload) => {
+      calls.push(["setBadgeText", payload]);
+      return Promise.reject(
+        new Error(`Unexpected error for tab ${payload.tabId}`),
+      );
+    },
+    setBadgeBackgroundColor: (payload) => {
+      calls.push(["setBadgeBackgroundColor", payload]);
+      return Promise.reject(
+        new Error(`Unexpected error for tab ${payload.tabId}`),
+      );
+    },
   };
 
   const chrome = {
@@ -480,8 +493,12 @@ test("setBadgeForTab: No tab with id 以外の Promise reject は console.error 
   context.setBadgeForTab(77, "https://laws.e-gov.go.jp/law/a", 0);
   await Promise.resolve();
   await Promise.resolve();
+  context.setBadgeForTab(77, "https://laws.e-gov.go.jp/law/a", 0);
+  await Promise.resolve();
+  await Promise.resolve();
 
-  assert.equal(errors.length, 3);
+  assert.equal(errors.length, 6);
+  assert.equal(calls.length, 6);
   errors.forEach((line) => {
     assert.match(line, /\[e-Gov Decorator\] action API call failed:/);
     assert.match(line, /Unexpected error for tab 77/);

@@ -610,7 +610,14 @@ function dispatchUrlChangeEvent() {
     window.dispatchEvent(new window.Event("egov-locationchange"));
     return;
   }
-  window.dispatchEvent({ type: "egov-locationchange" });
+  if (
+    typeof document !== "undefined" &&
+    typeof document.createEvent === "function"
+  ) {
+    const event = document.createEvent("Event");
+    event.initEvent("egov-locationchange", true, true);
+    window.dispatchEvent(event);
+  }
 }
 
 function patchHistoryMethod(methodName) {
