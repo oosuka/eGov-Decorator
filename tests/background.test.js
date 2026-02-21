@@ -253,3 +253,61 @@ test("runtime.onMessage: content 初期化通知で送信元タブを更新", ()
     ["setBadgeBackgroundColor", { tabId: 30, color: "#d93025" }],
   ]);
 });
+
+test("setBadgeForTab: 閉じたタブの Promise reject(No tab with id) を無視する", async () => {
+  const calls = [];
+  const actionApi = {
+    setPopup: (payload) => {
+      calls.push(["setPopup", payload]);
+      return Promise.reject(new Error(`No tab with id: ${payload.tabId}.`));
+    },
+    setBadgeText: (payload) => {
+      calls.push(["setBadgeText", payload]);
+      return Promise.reject(new Error(`No tab with id: ${payload.tabId}.`));
+    },
+    setBadgeBackgroundColor: (payload) => {
+      calls.push(["setBadgeBackgroundColor", payload]);
+      return Promise.reject(new Error(`No tab with id: ${payload.tabId}.`));
+    },
+  };
+
+  const chrome = {
+    action: actionApi,
+    browserAction: null,
+    commands: { onCommand: createEvent() },
+    runtime: {
+      onInstalled: createEvent(),
+      onStartup: createEvent(),
+      onMessage: createEvent(),
+      lastError: null,
+    },
+    tabs: {
+      query: (_query, cb) => cb([]),
+      get: (_id, cb) => cb(null),
+      onActivated: createEvent(),
+      onUpdated: createEvent(),
+      onRemoved: createEvent(),
+    },
+    windows: { onFocusChanged: createEvent(), WINDOW_ID_NONE: -1 },
+    storage: {
+      local: {
+        get: (_keys, cb) => cb({ highlightLevel: 0 }),
+        set: (_items, cb) => cb && cb(),
+      },
+      onChanged: createEvent(),
+    },
+  };
+
+  const context = { chrome, Map, console };
+  loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
+
+  context.setBadgeForTab(99, "https://laws.e-gov.go.jp/a", 0);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 99, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 99, text: "H1" }],
+    ["setBadgeBackgroundColor", { tabId: 99, color: "#d93025" }],
+  ]);
+});

@@ -42,6 +42,8 @@
 - タブ/メッセージ連動:
   - `tabs.onUpdated`（loading -> complete）で再描画
   - `runtime.onMessage`（content ready）で送信元タブ更新
+- 耐障害性:
+  - 閉じたタブに対する action API の `No tab with id` Promise reject を無視して未処理例外を回避
 
 ### `content.test.js`
 
@@ -72,7 +74,7 @@
   - `removeHighlightInRoot` 後の `normalize()` 実行（同一親は1回、複数親は親ごと）
   - `isDecoratorEnabled` の既定有効扱い
 
-現在の単体テスト件数は 35 件です（`npm run test`）。
+現在の単体テスト件数は 36 件です（`npm run test`）。
 
 ### `options.test.js`
 
