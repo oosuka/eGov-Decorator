@@ -128,9 +128,12 @@ function buildHighlightFragmentWithDepth(
   minHighlightDepth,
   initialDepth,
 ) {
-  const docFragment = document.createDocumentFragment();
   if (!text || text.length === 0) {
-    return { docFragment, endDepth: initialDepth, hasHighlight: false };
+    return {
+      docFragment: document.createDocumentFragment(),
+      endDepth: initialDepth,
+      hasHighlight: false,
+    };
   }
 
   let depth = initialDepth;
