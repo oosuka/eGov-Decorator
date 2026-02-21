@@ -1,1 +1,5 @@
 assets/icons/
+node_modules/
+dist/
+coverage/
+.husky/_/
