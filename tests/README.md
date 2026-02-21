@@ -24,7 +24,7 @@
 以下を網羅しています。
 
 - `isTargetUrl`:
-  - 対象URL（`laws` / `elaws`）判定
+  - 対象URL（`laws` / `elaws` の `/law/*`）判定
 - 初期化時バッジ:
   - `highlightLevel` 保存値を反映したバッジ表示
   - legacy `decoratorEnabled=false` から `OFF` 表示への移行
@@ -41,14 +41,22 @@
   - legacy `decoratorEnabled` 変更反映
 - タブ/メッセージ連動:
   - `tabs.onUpdated`（loading -> complete）で再描画
+  - `tabs.onUpdated` の URL 更新で content 再同期メッセージ送信（対象/非対象の両方、同一URL重複送信は抑止）
+  - `tabs.onUpdated` の URL 更新で e-Gov ドメイン外には再同期メッセージを送信しない
+  - 受信者なしエラー時に同一URLの再同期を再試行できること
   - `runtime.onMessage`（content ready）で送信元タブ更新
+- 耐障害性:
+  - 閉じたタブに対する action API の `No tab with id` Promise reject を無視して未処理例外を回避
+  - `No tab with id` 以外の Promise reject は `console.error` で処理
+  - action API の非同期失敗確定前でも同一状態更新を再試行できることを検証
+  - 同期 throw の `No tab with id` でもキャッシュ不整合が残らないことを検証
 
 ### `content.test.js`
 
 以下を網羅しています。
 
 - 基本ハイライト分割:
-  - 括弧部分のみ `span.highlight` 化
+  - 括弧部分のみ `span.egov-highlight` 化
   - ネスト括弧を1塊として扱う
 - レベル別挙動:
   - H2相当（2階層目以降）
@@ -66,13 +74,14 @@
   - `getCrossNodeContainer` の安全/危険タグ判定
 - ノード収集条件:
   - `script/style` 除外
-  - 既存 `.highlight` 内除外
+  - 既存 `.egov-highlight` 内除外
 - 互換/安定化:
   - `getStoredHighlightLevel` の legacy マッピング
   - `removeHighlightInRoot` 後の `normalize()` 実行（同一親は1回、複数親は親ごと）
   - `isDecoratorEnabled` の既定有効扱い
+  - 非対象URLで `setHighlightLevel` が DOM を変更しないこと
 
-現在の単体テスト件数は 35 件です（`npm run test`）。
+現在の単体テスト件数は 45 件です（`npm run test`）。
 
 ### `options.test.js`
 
@@ -92,6 +101,7 @@
 単体テストとしては主要ロジックを網羅していますが、次は未カバーです。
 
 - 実ブラウザ上の統合挙動（実DOM/CSSでの最終描画）
+- 同一ドキュメント遷移（検索結果↔法令詳細）時の URL 監視と有効/無効切替の統合挙動
 - ネイティブカラーピッカーUIのOS/ブラウザ差
 - 大規模ページでの体感性能や描画ちらつき
 
