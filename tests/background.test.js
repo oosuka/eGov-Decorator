@@ -555,18 +555,94 @@ test("setBadgeForTab: No tab with id 以外の Promise reject は console.error 
   loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
 
   context.setBadgeForTab(77, "https://laws.e-gov.go.jp/law/a", 0);
-  await Promise.resolve();
-  await Promise.resolve();
-  context.setBadgeForTab(77, "https://laws.e-gov.go.jp/law/a", 0);
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
 
-  assert.equal(errors.length, 6);
-  assert.equal(calls.length, 6);
+  assert.equal(errors.length, 3);
+  assert.equal(calls.length, 3);
   errors.forEach((line) => {
     assert.match(line, /\[e-Gov Decorator\] action API call failed:/);
     assert.match(line, /Unexpected error for tab 77/);
   });
+});
+
+test("setBadgeForTab: 非同期 reject 確定前でも同一状態の再試行を抑止しない", async () => {
+  const errors = [];
+  const calls = [];
+  const actionApi = {
+    setPopup: (payload) => {
+      calls.push(["setPopup", payload]);
+      return new Promise((_, reject) => {
+        setImmediate(() =>
+          reject(new Error(`Unexpected error for tab ${payload.tabId}`)),
+        );
+      });
+    },
+    setBadgeText: (payload) => {
+      calls.push(["setBadgeText", payload]);
+      return new Promise((_, reject) => {
+        setImmediate(() =>
+          reject(new Error(`Unexpected error for tab ${payload.tabId}`)),
+        );
+      });
+    },
+    setBadgeBackgroundColor: (payload) => {
+      calls.push(["setBadgeBackgroundColor", payload]);
+      return new Promise((_, reject) => {
+        setImmediate(() =>
+          reject(new Error(`Unexpected error for tab ${payload.tabId}`)),
+        );
+      });
+    },
+  };
+
+  const chrome = {
+    action: actionApi,
+    browserAction: null,
+    commands: { onCommand: createEvent() },
+    runtime: {
+      onInstalled: createEvent(),
+      onStartup: createEvent(),
+      onMessage: createEvent(),
+      lastError: null,
+    },
+    tabs: {
+      query: (_query, cb) => cb([]),
+      get: (_id, cb) => cb(null),
+      onActivated: createEvent(),
+      onUpdated: createEvent(),
+      onRemoved: createEvent(),
+    },
+    windows: { onFocusChanged: createEvent(), WINDOW_ID_NONE: -1 },
+    storage: {
+      local: {
+        get: (_keys, cb) => cb({ highlightLevel: 0 }),
+        set: (_items, cb) => cb && cb(),
+      },
+      onChanged: createEvent(),
+    },
+  };
+
+  const context = {
+    chrome,
+    Map,
+    console: {
+      error: (...args) => errors.push(args.map(String).join(" ")),
+      log: () => {},
+      warn: () => {},
+    },
+  };
+
+  loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
+
+  context.setBadgeForTab(78, "https://laws.e-gov.go.jp/law/a", 0);
+  context.setBadgeForTab(78, "https://laws.e-gov.go.jp/law/a", 0);
+
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(calls.length, 6);
+  assert.equal(errors.length, 6);
 });
 
 test("setBadgeForTab: 同期 throw(No tab with id) 時にキャッシュを残さない", () => {

@@ -77,22 +77,76 @@ function isNoTabWithIdError(error) {
 function runActionApiCall(tabId, fn) {
   try {
     const maybePromise = fn();
-    if (maybePromise && typeof maybePromise.catch === "function") {
-      maybePromise.catch((error) => {
-        badgeStateCache.delete(tabId);
-        if (isNoTabWithIdError(error)) return;
-        console.error(ACTION_API_ERROR_PREFIX, error);
-      });
+    if (maybePromise && typeof maybePromise.then === "function") {
+      return {
+        shouldContinue: true,
+        hadSyncError: false,
+        asyncResult: Promise.resolve(maybePromise)
+          .then(() => true)
+          .catch((error) => {
+            badgeStateCache.delete(tabId);
+            if (isNoTabWithIdError(error)) return false;
+            console.error(ACTION_API_ERROR_PREFIX, error);
+            return false;
+          }),
+      };
     }
-    return true;
+    return {
+      shouldContinue: true,
+      hadSyncError: false,
+      asyncResult: null,
+    };
   } catch (error) {
     badgeStateCache.delete(tabId);
     if (isNoTabWithIdError(error)) {
-      return false;
+      return {
+        shouldContinue: false,
+        hadSyncError: true,
+        asyncResult: null,
+      };
     }
     console.error(ACTION_API_ERROR_PREFIX, error);
-    return true;
+    return {
+      shouldContinue: true,
+      hadSyncError: true,
+      asyncResult: null,
+    };
   }
+}
+
+function createBadgeCacheCommitter(tabId, nextBadgeState) {
+  let hasSyncError = false;
+  const pending = [];
+
+  function apply(call) {
+    const result = runActionApiCall(tabId, call);
+    if (result.hadSyncError) {
+      hasSyncError = true;
+    }
+    if (result.asyncResult) {
+      pending.push(result.asyncResult);
+    }
+    return result.shouldContinue;
+  }
+
+  function commit() {
+    if (pending.length === 0) {
+      if (!hasSyncError) {
+        badgeStateCache.set(tabId, nextBadgeState);
+      }
+      return;
+    }
+
+    Promise.all(pending).then((results) => {
+      if (!hasSyncError && results.every(Boolean)) {
+        badgeStateCache.set(tabId, nextBadgeState);
+        return;
+      }
+      badgeStateCache.delete(tabId);
+    });
+  }
+
+  return { apply, commit };
 }
 
 function setBadgeForTab(tabId, url, highlightLevel) {
@@ -101,9 +155,11 @@ function setBadgeForTab(tabId, url, highlightLevel) {
   const nextBadgeState = isTarget ? `level-${highlightLevel}` : "hidden";
   if (badgeStateCache.get(tabId) === nextBadgeState) return;
 
+  const cacheCommitter = createBadgeCacheCommitter(tabId, nextBadgeState);
+
   if (typeof actionApi.setPopup === "function") {
     if (
-      !runActionApiCall(tabId, () =>
+      !cacheCommitter.apply(() =>
         actionApi.setPopup({
           tabId,
           popup: isTarget ? ENABLED_POPUP_PATH : DISABLED_POPUP_PATH,
@@ -116,25 +172,23 @@ function setBadgeForTab(tabId, url, highlightLevel) {
 
   if (!isTarget) {
     if (
-      !runActionApiCall(tabId, () =>
-        actionApi.setBadgeText({ tabId, text: "" }),
-      )
+      !cacheCommitter.apply(() => actionApi.setBadgeText({ tabId, text: "" }))
     ) {
       return;
     }
-    badgeStateCache.set(tabId, nextBadgeState);
+    cacheCommitter.commit();
     return;
   }
 
   if (
-    !runActionApiCall(tabId, () =>
+    !cacheCommitter.apply(() =>
       actionApi.setBadgeText({ tabId, text: getBadgeText(highlightLevel) }),
     )
   ) {
     return;
   }
   if (
-    !runActionApiCall(tabId, () =>
+    !cacheCommitter.apply(() =>
       actionApi.setBadgeBackgroundColor({
         tabId,
         color: getBadgeColor(highlightLevel),
@@ -143,7 +197,7 @@ function setBadgeForTab(tabId, url, highlightLevel) {
   ) {
     return;
   }
-  badgeStateCache.set(tabId, nextBadgeState);
+  cacheCommitter.commit();
 }
 
 function withHighlightLevel(callback) {

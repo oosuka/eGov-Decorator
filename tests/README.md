@@ -48,6 +48,7 @@
 - 耐障害性:
   - 閉じたタブに対する action API の `No tab with id` Promise reject を無視して未処理例外を回避
   - `No tab with id` 以外の Promise reject は `console.error` で処理
+  - action API の非同期失敗確定前でも同一状態更新を再試行できることを検証
   - 同期 throw の `No tab with id` でもキャッシュ不整合が残らないことを検証
 
 ### `content.test.js`
@@ -80,7 +81,7 @@
   - `isDecoratorEnabled` の既定有効扱い
   - 非対象URLで `setHighlightLevel` が DOM を変更しないこと
 
-現在の単体テスト件数は 44 件です（`npm run test`）。
+現在の単体テスト件数は 45 件です（`npm run test`）。
 
 ### `options.test.js`
 
