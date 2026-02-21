@@ -61,7 +61,21 @@ function createBackgroundHarness(options = {}) {
       get: (_id, cb) => cb(null),
       sendMessage: (tabId, message, cb) => {
         calls.push(["sendMessage", { tabId, message }]);
-        if (cb) cb();
+        if (!cb) return;
+        const invokeCallback = () => {
+          if (options.sendMessageLastError) {
+            chrome.runtime.lastError = { message: "No receiver" };
+          } else {
+            chrome.runtime.lastError = null;
+          }
+          cb();
+          chrome.runtime.lastError = null;
+        };
+        if (typeof setImmediate === "function") {
+          setImmediate(invokeCallback);
+          return;
+        }
+        setTimeout(invokeCallback, 0);
       },
       onActivated: events.onActivated,
       onUpdated: events.onUpdated,
@@ -386,6 +400,34 @@ test("tabs.onUpdated: 同一URLへの再同期メッセージは重複送信し�
       entry[1].message.type === "egov-force-sync",
   );
   assert.equal(syncCalls.length, 1);
+});
+
+test("tabs.onUpdated: 受信者なしエラー時は同一URLでも再試行できる", async () => {
+  const { events, calls } = createBackgroundHarness({
+    initialHighlightLevel: 0,
+    sendMessageLastError: true,
+  });
+
+  events.onUpdated.emit(
+    35,
+    { url: "https://laws.e-gov.go.jp/law/a" },
+    { url: "https://laws.e-gov.go.jp/law/a" },
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+
+  events.onUpdated.emit(
+    35,
+    { url: "https://laws.e-gov.go.jp/law/a" },
+    { url: "https://laws.e-gov.go.jp/law/a" },
+  );
+
+  const syncCalls = normalize(calls).filter(
+    (entry) =>
+      entry[0] === "sendMessage" &&
+      entry[1].tabId === 35 &&
+      entry[1].message.type === "egov-force-sync",
+  );
+  assert.equal(syncCalls.length, 2);
 });
 
 test("setBadgeForTab: 閉じたタブの Promise reject(No tab with id) を無視する", async () => {

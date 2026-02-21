@@ -198,10 +198,14 @@ function requestContentSyncForTab(tabId, url) {
     return;
   }
   if (contentSyncUrlCache.get(tabId) === url) return;
+
+  // Mark as in-flight to suppress duplicate sends before async callback runs.
+  contentSyncUrlCache.set(tabId, url);
   chrome.tabs.sendMessage(tabId, CONTENT_FORCE_SYNC_MESSAGE, () => {
     // Ignore missing receiver errors; content script may not be loaded yet.
-    if (chrome.runtime.lastError) return;
-    contentSyncUrlCache.set(tabId, url);
+    if (chrome.runtime.lastError && contentSyncUrlCache.get(tabId) === url) {
+      contentSyncUrlCache.delete(tabId);
+    }
   });
 }
 
