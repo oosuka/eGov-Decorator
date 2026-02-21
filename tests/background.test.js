@@ -87,6 +87,21 @@ function normalize(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+async function captureUnhandledRejections(run) {
+  const reasons = [];
+  const onUnhandledRejection = (reason) => {
+    reasons.push(reason);
+  };
+  process.on("unhandledRejection", onUnhandledRejection);
+  try {
+    await run();
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    process.off("unhandledRejection", onUnhandledRejection);
+  }
+  return reasons;
+}
+
 test("isTargetUrl: laws/elaws のみ true", () => {
   const { context } = createBackgroundHarness();
   assert.equal(context.isTargetUrl("https://laws.e-gov.go.jp/test"), true);
@@ -251,5 +266,179 @@ test("runtime.onMessage: content 初期化通知で送信元タブを更新", ()
     ["setPopup", { tabId: 30, popup: "src/popup.html" }],
     ["setBadgeText", { tabId: 30, text: "H1" }],
     ["setBadgeBackgroundColor", { tabId: 30, color: "#d93025" }],
+  ]);
+});
+
+test("setBadgeForTab: 閉じたタブの Promise reject(No tab with id) を無視する", async () => {
+  const calls = [];
+  const actionApi = {
+    setPopup: (payload) => {
+      calls.push(["setPopup", payload]);
+      return Promise.reject(new Error(`No tab with id: ${payload.tabId}.`));
+    },
+    setBadgeText: (payload) => {
+      calls.push(["setBadgeText", payload]);
+      return Promise.reject(new Error(`No tab with id: ${payload.tabId}.`));
+    },
+    setBadgeBackgroundColor: (payload) => {
+      calls.push(["setBadgeBackgroundColor", payload]);
+      return Promise.reject(new Error(`No tab with id: ${payload.tabId}.`));
+    },
+  };
+
+  const chrome = {
+    action: actionApi,
+    browserAction: null,
+    commands: { onCommand: createEvent() },
+    runtime: {
+      onInstalled: createEvent(),
+      onStartup: createEvent(),
+      onMessage: createEvent(),
+      lastError: null,
+    },
+    tabs: {
+      query: (_query, cb) => cb([]),
+      get: (_id, cb) => cb(null),
+      onActivated: createEvent(),
+      onUpdated: createEvent(),
+      onRemoved: createEvent(),
+    },
+    windows: { onFocusChanged: createEvent(), WINDOW_ID_NONE: -1 },
+    storage: {
+      local: {
+        get: (_keys, cb) => cb({ highlightLevel: 0 }),
+        set: (_items, cb) => cb && cb(),
+      },
+      onChanged: createEvent(),
+    },
+  };
+
+  const context = { chrome, Map, console };
+  loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
+
+  const unhandledRejections = await captureUnhandledRejections(async () => {
+    context.setBadgeForTab(99, "https://laws.e-gov.go.jp/a", 0);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 99, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 99, text: "H1" }],
+    ["setBadgeBackgroundColor", { tabId: 99, color: "#d93025" }],
+  ]);
+  assert.equal(unhandledRejections.length, 0);
+});
+
+test("setBadgeForTab: No tab with id 以外の Promise reject は console.error で処理する", async () => {
+  const errors = [];
+  const actionApi = {
+    setPopup: (payload) =>
+      Promise.reject(new Error(`Unexpected error for tab ${payload.tabId}`)),
+    setBadgeText: (payload) =>
+      Promise.reject(new Error(`Unexpected error for tab ${payload.tabId}`)),
+    setBadgeBackgroundColor: (payload) =>
+      Promise.reject(new Error(`Unexpected error for tab ${payload.tabId}`)),
+  };
+
+  const chrome = {
+    action: actionApi,
+    browserAction: null,
+    commands: { onCommand: createEvent() },
+    runtime: {
+      onInstalled: createEvent(),
+      onStartup: createEvent(),
+      onMessage: createEvent(),
+      lastError: null,
+    },
+    tabs: {
+      query: (_query, cb) => cb([]),
+      get: (_id, cb) => cb(null),
+      onActivated: createEvent(),
+      onUpdated: createEvent(),
+      onRemoved: createEvent(),
+    },
+    windows: { onFocusChanged: createEvent(), WINDOW_ID_NONE: -1 },
+    storage: {
+      local: {
+        get: (_keys, cb) => cb({ highlightLevel: 0 }),
+        set: (_items, cb) => cb && cb(),
+      },
+      onChanged: createEvent(),
+    },
+  };
+
+  const context = {
+    chrome,
+    Map,
+    console: {
+      error: (...args) => errors.push(args.map(String).join(" ")),
+      log: () => {},
+      warn: () => {},
+    },
+  };
+
+  loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
+
+  context.setBadgeForTab(77, "https://laws.e-gov.go.jp/a", 0);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.equal(errors.length, 3);
+  errors.forEach((line) => {
+    assert.match(line, /\[e-Gov Decorator\] action API call failed:/);
+    assert.match(line, /Unexpected error for tab 77/);
+  });
+});
+
+test("setBadgeForTab: 同期 throw(No tab with id) 時にキャッシュを残さない", () => {
+  const calls = [];
+  const actionApi = {
+    setPopup: () => {},
+    setBadgeText: (payload) => {
+      calls.push(payload);
+      throw new Error(`No tab with id: ${payload.tabId}.`);
+    },
+    setBadgeBackgroundColor: () => {
+      throw new Error("should not be called");
+    },
+  };
+
+  const chrome = {
+    action: actionApi,
+    browserAction: null,
+    commands: { onCommand: createEvent() },
+    runtime: {
+      onInstalled: createEvent(),
+      onStartup: createEvent(),
+      onMessage: createEvent(),
+      lastError: null,
+    },
+    tabs: {
+      query: (_query, cb) => cb([]),
+      get: (_id, cb) => cb(null),
+      onActivated: createEvent(),
+      onUpdated: createEvent(),
+      onRemoved: createEvent(),
+    },
+    windows: { onFocusChanged: createEvent(), WINDOW_ID_NONE: -1 },
+    storage: {
+      local: {
+        get: (_keys, cb) => cb({ highlightLevel: 0 }),
+        set: (_items, cb) => cb && cb(),
+      },
+      onChanged: createEvent(),
+    },
+  };
+
+  const context = { chrome, Map, console };
+  loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
+
+  context.setBadgeForTab(55, "https://example.com/", 0);
+  context.setBadgeForTab(55, "https://example.com/", 0);
+
+  assert.deepEqual(normalize(calls), [
+    { tabId: 55, text: "" },
+    { tabId: 55, text: "" },
   ]);
 });

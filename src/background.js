@@ -9,6 +9,8 @@ const BADGE_BG_ON = "#d93025";
 const BADGE_BG_OFF = "#188038";
 const actionApi = chrome.action || chrome.browserAction;
 const badgeStateCache = new Map();
+const NO_TAB_WITH_ID_ERROR_PREFIX = "No tab with id:";
+const ACTION_API_ERROR_PREFIX = "[e-Gov Decorator] action API call failed:";
 
 function isTargetUrl(url) {
   return typeof url === "string" && TARGET_URL_PATTERN.test(url);
@@ -56,6 +58,36 @@ function getNextHighlightLevel(level) {
   return level + 1;
 }
 
+function isNoTabWithIdError(error) {
+  return (
+    typeof error?.message === "string" &&
+    error.message.startsWith(NO_TAB_WITH_ID_ERROR_PREFIX)
+  );
+}
+
+function runActionApiCall(tabId, fn) {
+  try {
+    const maybePromise = fn();
+    if (maybePromise && typeof maybePromise.catch === "function") {
+      maybePromise.catch((error) => {
+        if (isNoTabWithIdError(error)) {
+          badgeStateCache.delete(tabId);
+          return;
+        }
+        console.error(ACTION_API_ERROR_PREFIX, error);
+      });
+    }
+    return true;
+  } catch (error) {
+    if (isNoTabWithIdError(error)) {
+      badgeStateCache.delete(tabId);
+      return false;
+    }
+    console.error(ACTION_API_ERROR_PREFIX, error);
+    return true;
+  }
+}
+
 function setBadgeForTab(tabId, url, highlightLevel) {
   if (tabId == null || !actionApi) return;
   const isTarget = isTargetUrl(url);
@@ -63,23 +95,47 @@ function setBadgeForTab(tabId, url, highlightLevel) {
   if (badgeStateCache.get(tabId) === nextBadgeState) return;
 
   if (typeof actionApi.setPopup === "function") {
-    actionApi.setPopup({
-      tabId,
-      popup: isTarget ? "src/popup.html" : "src/popup-disabled.html",
-    });
+    if (
+      !runActionApiCall(tabId, () =>
+        actionApi.setPopup({
+          tabId,
+          popup: isTarget ? "src/popup.html" : "src/popup-disabled.html",
+        }),
+      )
+    ) {
+      return;
+    }
   }
 
   if (!isTarget) {
-    actionApi.setBadgeText({ tabId, text: "" });
+    if (
+      !runActionApiCall(tabId, () =>
+        actionApi.setBadgeText({ tabId, text: "" }),
+      )
+    ) {
+      return;
+    }
     badgeStateCache.set(tabId, nextBadgeState);
     return;
   }
 
-  actionApi.setBadgeText({ tabId, text: getBadgeText(highlightLevel) });
-  actionApi.setBadgeBackgroundColor({
-    tabId,
-    color: getBadgeColor(highlightLevel),
-  });
+  if (
+    !runActionApiCall(tabId, () =>
+      actionApi.setBadgeText({ tabId, text: getBadgeText(highlightLevel) }),
+    )
+  ) {
+    return;
+  }
+  if (
+    !runActionApiCall(tabId, () =>
+      actionApi.setBadgeBackgroundColor({
+        tabId,
+        color: getBadgeColor(highlightLevel),
+      }),
+    )
+  ) {
+    return;
+  }
   badgeStateCache.set(tabId, nextBadgeState);
 }
 
