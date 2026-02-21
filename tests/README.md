@@ -53,7 +53,7 @@
 以下を網羅しています。
 
 - 基本ハイライト分割:
-  - 括弧部分のみ `span.highlight` 化
+  - 括弧部分のみ `span.egov-highlight` 化
   - ネスト括弧を1塊として扱う
 - レベル別挙動:
   - H2相当（2階層目以降）
@@ -71,13 +71,14 @@
   - `getCrossNodeContainer` の安全/危険タグ判定
 - ノード収集条件:
   - `script/style` 除外
-  - 既存 `.highlight` 内除外
+  - 既存 `.egov-highlight` 内除外
 - 互換/安定化:
   - `getStoredHighlightLevel` の legacy マッピング
   - `removeHighlightInRoot` 後の `normalize()` 実行（同一親は1回、複数親は親ごと）
   - `isDecoratorEnabled` の既定有効扱い
+  - 非対象URLで `setHighlightLevel` が DOM を変更しないこと
 
-現在の単体テスト件数は 41 件です（`npm run test`）。
+現在の単体テスト件数は 42 件です（`npm run test`）。
 
 ### `options.test.js`
 

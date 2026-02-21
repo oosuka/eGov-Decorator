@@ -87,7 +87,7 @@ function walkTextNodes(root, result = []) {
 
 function collectHighlightTexts(root, result = []) {
   if (!root) return result;
-  if (root.className === "highlight") {
+  if (root.className === "egov-highlight") {
     result.push(root.textContent);
   }
   if (!root.childNodes) return result;
@@ -146,7 +146,7 @@ test("applyHighlightToNode: 括弧部分のみハイライト要素化", () => {
 
   assert.equal(fragment.childNodes.length, 3);
   assert.equal(fragment.childNodes[0].textContent, "abc");
-  assert.equal(fragment.childNodes[1].className, "highlight");
+  assert.equal(fragment.childNodes[1].className, "egov-highlight");
   assert.equal(fragment.childNodes[1].textContent, "（X）");
   assert.equal(fragment.childNodes[2].textContent, "def");
 });
@@ -170,7 +170,7 @@ test("applyHighlightToNode: H2 相当では2階層目以降のみハイライト
 
   assert.equal(fragment.childNodes.length, 3);
   assert.equal(fragment.childNodes[0].textContent, "■（あ");
-  assert.equal(fragment.childNodes[1].className, "highlight");
+  assert.equal(fragment.childNodes[1].className, "egov-highlight");
   assert.equal(fragment.childNodes[1].textContent, "（い（う）い）");
   assert.equal(fragment.childNodes[2].textContent, "あ）■");
 });
@@ -184,7 +184,7 @@ test("applyHighlightToNode: H3 相当では3階層目以降のみハイライト
 
   assert.equal(fragment.childNodes.length, 3);
   assert.equal(fragment.childNodes[0].textContent, "■（あ（い");
-  assert.equal(fragment.childNodes[1].className, "highlight");
+  assert.equal(fragment.childNodes[1].className, "egov-highlight");
   assert.equal(fragment.childNodes[1].textContent, "（う）");
   assert.equal(fragment.childNodes[2].textContent, "い）あ）■");
 });
@@ -215,7 +215,7 @@ test("buildHighlightFragmentWithDepth: 跨ぎ中ノードは括弧文字なし�
   assert.equal(result.hasHighlight, true);
   assert.equal(result.endDepth, 1);
   assert.equal(result.docFragment.childNodes.length, 1);
-  assert.equal(result.docFragment.childNodes[0].className, "highlight");
+  assert.equal(result.docFragment.childNodes[0].className, "egov-highlight");
   assert.equal(result.docFragment.childNodes[0].textContent, "第三項");
 });
 
@@ -352,7 +352,7 @@ test("collectDecoratableTextNodes: script/style と既存 highlight 内を除外
   script.appendChild(new FakeTextNode("skip（B）"));
 
   const highlightedSpan = new FakeElement("span");
-  highlightedSpan.className = "highlight";
+  highlightedSpan.className = "egov-highlight";
   highlightedSpan.appendChild(new FakeTextNode("skip（C）"));
 
   root.appendChild(p);
@@ -422,4 +422,17 @@ test("isDecoratorEnabled: false のみ無効、それ以外は有効", () => {
   assert.equal(context.isDecoratorEnabled(false), false);
   assert.equal(context.isDecoratorEnabled(undefined), true);
   assert.equal(context.isDecoratorEnabled(true), true);
+});
+
+test("setHighlightLevel: 非対象URLでは DOM を変更しない", () => {
+  const { context } = createContentContext();
+  let touched = false;
+  context.document.querySelectorAll = () => {
+    touched = true;
+    return [];
+  };
+
+  context.setHighlightLevel(1);
+
+  assert.equal(touched, false);
 });

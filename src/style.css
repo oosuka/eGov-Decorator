@@ -1,4 +1,4 @@
-.highlight {
+.egov-highlight {
   background-color: var(--egov-highlight-bg, #e6e6e6);
   color: var(--egov-highlight-text, #ffffff);
 }

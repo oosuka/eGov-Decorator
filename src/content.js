@@ -1,6 +1,6 @@
 function createHighlightedElement(text) {
   const span = document.createElement("span");
-  span.className = "highlight";
+  span.className = "egov-highlight";
   span.textContent = text;
   return span;
 }
@@ -190,7 +190,7 @@ function buildHighlightFragmentWithDepth(
   return { docFragment: maskedFragment, endDepth: depth, hasHighlight };
 }
 
-// テキストノードを分解し、指定ネスト階層以降のみ span.highlight で包む
+// テキストノードを分解し、指定ネスト階層以降のみ span.egov-highlight で包む
 function applyHighlightToNode(
   node,
   minHighlightDepth = getMinHighlightDepth(currentHighlightLevel),
@@ -278,7 +278,7 @@ function buildFragmentFromMask(text, highlightMask) {
 function fragmentHasHighlight(fragment) {
   if (!fragment || !fragment.childNodes) return false;
   return Array.from(fragment.childNodes).some(
-    (child) => child.classList && child.classList.contains("highlight"),
+    (child) => child.classList && child.classList.contains("egov-highlight"),
   );
 }
 
@@ -289,7 +289,7 @@ function shouldSkipTextNodeByParentName(parentName) {
 function isInsideHighlightElement(node) {
   let current = node && node.parentNode;
   while (current) {
-    if (current.classList && current.classList.contains("highlight")) {
+    if (current.classList && current.classList.contains("egov-highlight")) {
       return true;
     }
     current = current.parentNode;
@@ -467,7 +467,7 @@ function applyHighlight(root = document.body) {
 function removeHighlightInRoot(root) {
   if (!root || typeof root.querySelectorAll !== "function") return;
   const touchedParents = new Set();
-  root.querySelectorAll("span.highlight").forEach((span) => {
+  root.querySelectorAll("span.egov-highlight").forEach((span) => {
     const parent = span.parentNode;
     if (parent) {
       parent.replaceChild(document.createTextNode(span.textContent), span);
@@ -525,9 +525,11 @@ function setHighlightLevel(level) {
   if (nextLevel === currentHighlightLevel) return;
 
   currentHighlightLevel = nextLevel;
+  if (!isCurrentUrlTarget) return;
+
   withObserverPaused(() => {
     removeHighlightInRoot(document);
-    if (isCurrentUrlTarget && isHighlightEnabled(currentHighlightLevel)) {
+    if (isHighlightEnabled(currentHighlightLevel)) {
       applyHighlightInRoot(document.body);
     }
   });
