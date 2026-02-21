@@ -1,4 +1,4 @@
-const TARGET_URL_PATTERN = /^https:\/\/(?:elaws|laws)\.e-gov\.go\.jp\//;
+const TARGET_URL_PATTERN = /^https:\/\/(?:elaws|laws)\.e-gov\.go\.jp\/law\//;
 const DECORATOR_ENABLED_KEY = "decoratorEnabled";
 const HIGHLIGHT_LEVEL_KEY = "highlightLevel";
 const DEFAULT_HIGHLIGHT_LEVEL = 0;
@@ -7,8 +7,12 @@ const MAX_HIGHLIGHT_LEVEL = OFF_HIGHLIGHT_LEVEL;
 const BADGE_TEXT_OFF = "OFF";
 const BADGE_BG_ON = "#d93025";
 const BADGE_BG_OFF = "#188038";
+const ENABLED_POPUP_PATH = "src/popup.html";
+const DISABLED_POPUP_PATH = "src/popup-disabled.html";
+const CONTENT_FORCE_SYNC_MESSAGE = { type: "egov-force-sync" };
 const actionApi = chrome.action || chrome.browserAction;
 const badgeStateCache = new Map();
+const contentSyncUrlCache = new Map();
 const NO_TAB_WITH_ID_ERROR_PREFIX = "No tab with id:";
 const ACTION_API_ERROR_PREFIX = "[e-Gov Decorator] action API call failed:";
 
@@ -99,7 +103,7 @@ function setBadgeForTab(tabId, url, highlightLevel) {
       !runActionApiCall(tabId, () =>
         actionApi.setPopup({
           tabId,
-          popup: isTarget ? "src/popup.html" : "src/popup-disabled.html",
+          popup: isTarget ? ENABLED_POPUP_PATH : DISABLED_POPUP_PATH,
         }),
       )
     ) {
@@ -180,6 +184,23 @@ function refreshBadgeForTab(tabId, url) {
   });
 }
 
+function requestContentSyncForTab(tabId, url) {
+  if (
+    tabId == null ||
+    typeof url !== "string" ||
+    !chrome.tabs ||
+    typeof chrome.tabs.sendMessage !== "function"
+  ) {
+    return;
+  }
+  if (contentSyncUrlCache.get(tabId) === url) return;
+  chrome.tabs.sendMessage(tabId, CONTENT_FORCE_SYNC_MESSAGE, () => {
+    // Ignore missing receiver errors; content script may not be loaded yet.
+    if (chrome.runtime.lastError) return;
+    contentSyncUrlCache.set(tabId, url);
+  });
+}
+
 function refreshBadgeForActiveTab() {
   chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
     const tab = tabs && tabs[0];
@@ -238,11 +259,12 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "loading") {
     badgeStateCache.delete(tabId);
+    contentSyncUrlCache.delete(tabId);
   }
 
   if (typeof changeInfo.url === "string") {
     refreshBadgeForTab(tabId, changeInfo.url);
-    return;
+    requestContentSyncForTab(tabId, changeInfo.url);
   }
 
   if (changeInfo.status === "complete" && tab && typeof tab.url === "string") {
@@ -252,6 +274,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   badgeStateCache.delete(tabId);
+  contentSyncUrlCache.delete(tabId);
 });
 
 chrome.windows.onFocusChanged.addListener((windowId) => {

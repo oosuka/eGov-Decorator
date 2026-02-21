@@ -4,8 +4,8 @@ e-Gov 法令ページ内の全角括弧 `（...）` をハイライト表示す�
 対応ブラウザは Chrome / Microsoft Edge です。
 
 - 対象URL:
-  - `https://laws.e-gov.go.jp/*`
-  - `https://elaws.e-gov.go.jp/*`
+  - `https://laws.e-gov.go.jp/law/*`
+  - `https://elaws.e-gov.go.jp/law/*`
 
 ## 主な機能
 
@@ -13,6 +13,7 @@ e-Gov 法令ページ内の全角括弧 `（...）` をハイライト表示す�
 2. ショートカットでハイライトレベル切り替え（既定: Windows `Ctrl+Shift+X` / macOS `Command+Shift+X`）
 3. 拡張アイコンのバッジで状態表示
 4. 対象ページで拡張アイコンクリック時に色設定ポップアップを表示
+5. `laws` / `elaws` ドメイン内のページ遷移を監視し、`/law/*` で自動有効化・それ以外で自動無効化
 
 ## バッジ表示仕様
 
@@ -84,6 +85,8 @@ e-Gov 法令ページ内の全角括弧 `（...）` をハイライト表示す�
 - `storage` の変更検知で全タブへ状態を反映
 - タブ切り替え・URL変更・起動時にバッジ状態を再評価
 - タブ終了直後の競合で `No tab with id: ...` が返るケースは安全に無視し、未処理エラー化を防止
+- `laws` / `elaws` ドメイン内では履歴遷移（戻る/進む・検索結果→法令詳細）を監視し、対象URLへの切替時に即時反映
+- 背景スクリプトから content script へ再同期メッセージを送信し、URL切替時の取りこぼしを抑制
 
 ## 既定値
 
@@ -94,7 +97,7 @@ e-Gov 法令ページ内の全角括弧 `（...）` をハイライト表示す�
 ## 確認チェック（Chrome / Edge）
 
 1. ツールバーで `e-Gov Decorator` をピン留め
-2. `https://laws.e-gov.go.jp/` または `https://elaws.e-gov.go.jp/` を開く
+2. `https://laws.e-gov.go.jp/law/` または `https://elaws.e-gov.go.jp/law/` を開く
 3. 全角括弧 `（...）` がハイライトされることを確認
 4. バッジが `H1`（赤）で表示されることを確認
 5. Windowsは `Ctrl+Shift+X`、macOSは `Command+Shift+X` で `H2` / `H3` / `H4` / `OFF` / `H1` の順に循環することを確認
@@ -139,5 +142,6 @@ npm run format
 
 - 本拡張は外部サーバーへの送信機能（API連携、アップロード、Webhook等）を実装していません。
 - 保存データは `chrome.storage.local` 内の設定値（ハイライトレベル、色設定）のみです。
-- 権限は `storage` と `tabs` のみを使用し、対象外のサイトには動作しません。
+- `content_scripts` は `laws` / `elaws` ドメインで読み込まれますが、ハイライト処理は `https://laws.e-gov.go.jp/law/*` と `https://elaws.e-gov.go.jp/law/*` のみで有効化されます。
+- 権限は `storage` と `tabs` のみを使用します。
 - 処理内容は対象URL上の表示装飾（ハイライト）に限定され、業務データの収集や外部転送は行いません。

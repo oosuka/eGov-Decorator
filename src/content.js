@@ -6,6 +6,7 @@ function createHighlightedElement(text) {
 }
 
 const BRACKET_PATTERN = /[（）]/;
+const TARGET_URL_PATTERN = /^https:\/\/(?:elaws|laws)\.e-gov\.go\.jp\/law\//;
 const DEFAULT_BG_COLOR = "#e6e6e6";
 const DEFAULT_TEXT_COLOR = "#ffffff";
 const DECORATOR_ENABLED_KEY = "decoratorEnabled";
@@ -41,6 +42,9 @@ const HIGHLIGHT_BG_COLOR_KEY = "highlightBgColor";
 const HIGHLIGHT_TEXT_COLOR_KEY = "highlightTextColor";
 let currentHighlightBgColor = DEFAULT_BG_COLOR;
 let currentHighlightTextColor = DEFAULT_TEXT_COLOR;
+let isCurrentUrlTarget = false;
+let lastKnownUrl = "";
+let observerRoot = null;
 
 function getColorOrDefault(value, defaultColor) {
   return value || defaultColor;
@@ -52,6 +56,10 @@ function getStoredColor(result, key, defaultColor) {
 
 function isDecoratorEnabled(value) {
   return value !== false;
+}
+
+function isTargetUrl(url) {
+  return typeof url === "string" && TARGET_URL_PATTERN.test(url);
 }
 
 function normalizeHighlightLevel(value) {
@@ -432,21 +440,25 @@ function applyHighlightColors(bgColor, textColor) {
 }
 
 function withObserverPaused(callback) {
-  const wasObserving = isObserving && !!document.body;
+  const wasObserving = isObserving && !!observerRoot;
   if (wasObserving) {
     observer.disconnect();
     isObserving = false;
+    observerRoot = null;
   }
 
   callback();
 
-  if (wasObserving && document.body) {
-    observer.observe(document.body, observerConfig);
+  const nextRoot = getObserverRoot();
+  if (wasObserving && nextRoot) {
+    observer.observe(nextRoot, observerConfig);
     isObserving = true;
+    observerRoot = nextRoot;
   }
 }
 
 function applyHighlight(root = document.body) {
+  if (!isCurrentUrlTarget) return;
   withObserverPaused(() => {
     applyHighlightInRoot(root);
   });
@@ -489,7 +501,13 @@ let scheduled = false;
 
 // 変更通知は1フレームにまとめ、全体再走査の回数を抑える
 function scheduleHighlightRefresh() {
-  if (!isHighlightEnabled(currentHighlightLevel) || scheduled) return;
+  if (
+    !isCurrentUrlTarget ||
+    !isHighlightEnabled(currentHighlightLevel) ||
+    scheduled
+  ) {
+    return;
+  }
 
   scheduled = true;
   requestAnimationFrame(() => {
@@ -509,7 +527,7 @@ function setHighlightLevel(level) {
   currentHighlightLevel = nextLevel;
   withObserverPaused(() => {
     removeHighlightInRoot(document);
-    if (isHighlightEnabled(currentHighlightLevel)) {
+    if (isCurrentUrlTarget && isHighlightEnabled(currentHighlightLevel)) {
       applyHighlightInRoot(document.body);
     }
   });
@@ -519,14 +537,94 @@ const observer = new MutationObserver(() => {
   scheduleHighlightRefresh();
 });
 
-function startObserverWhenReady() {
-  if (document.body && !isObserving) {
-    observer.observe(document.body, observerConfig);
-    isObserving = true;
+function getObserverRoot() {
+  return document.documentElement || document.body || null;
+}
+
+function startObserverWhenReady(onReady) {
+  const root = getObserverRoot();
+  if (root) {
+    if (!isObserving || observerRoot !== root) {
+      observer.disconnect();
+      observer.observe(root, observerConfig);
+      isObserving = true;
+      observerRoot = root;
+    }
+    if (typeof onReady === "function") {
+      onReady();
+    }
     return;
   }
 
-  requestAnimationFrame(startObserverWhenReady);
+  requestAnimationFrame(() => {
+    startObserverWhenReady(onReady);
+  });
+}
+
+function getCurrentHref() {
+  if (typeof window === "undefined" || !window.location) return "";
+  return window.location.href || "";
+}
+
+function syncDecoratorByUrl(forceRefresh = false) {
+  const nextUrl = getCurrentHref();
+  const nextIsTarget = isTargetUrl(nextUrl);
+  const urlChanged = nextUrl !== lastKnownUrl;
+  if (!forceRefresh && !urlChanged && nextIsTarget === isCurrentUrlTarget)
+    return;
+
+  lastKnownUrl = nextUrl;
+  isCurrentUrlTarget = nextIsTarget;
+
+  if (!isCurrentUrlTarget) {
+    removeHighlight();
+    if (isObserving) {
+      observer.disconnect();
+      isObserving = false;
+      observerRoot = null;
+    }
+    return;
+  }
+
+  startObserverWhenReady(() => {
+    if (!isCurrentUrlTarget) return;
+    if (isHighlightEnabled(currentHighlightLevel)) {
+      applyHighlight();
+    } else {
+      removeHighlight();
+    }
+    notifyContentReady();
+  });
+}
+
+function dispatchUrlChangeEvent() {
+  if (
+    typeof window === "undefined" ||
+    typeof window.dispatchEvent !== "function"
+  ) {
+    return;
+  }
+  if (typeof window.Event === "function") {
+    window.dispatchEvent(new window.Event("egov-locationchange"));
+    return;
+  }
+  window.dispatchEvent({ type: "egov-locationchange" });
+}
+
+function patchHistoryMethod(methodName) {
+  if (typeof window === "undefined" || !window.history) return;
+  const original = window.history[methodName];
+  if (typeof original !== "function") return;
+
+  window.history[methodName] = function patchedHistoryMethod(...args) {
+    const result = original.apply(this, args);
+    dispatchUrlChangeEvent();
+    return result;
+  };
+}
+
+function handleUrlChangeSignal() {
+  syncDecoratorByUrl(true);
 }
 
 function initializeDecorator() {
@@ -551,13 +649,8 @@ function initializeDecorator() {
         DEFAULT_TEXT_COLOR,
       );
       applyHighlightColors(currentHighlightBgColor, currentHighlightTextColor);
-      startObserverWhenReady();
-      if (isHighlightEnabled(currentHighlightLevel)) {
-        applyHighlight();
-      } else {
-        removeHighlight();
-      }
-      notifyContentReady();
+      lastKnownUrl = getCurrentHref();
+      syncDecoratorByUrl();
     },
   );
 }
@@ -569,6 +662,26 @@ if (document.readyState === "loading") {
   });
 } else {
   initializeDecorator();
+}
+
+patchHistoryMethod("pushState");
+patchHistoryMethod("replaceState");
+if (
+  typeof window !== "undefined" &&
+  typeof window.addEventListener === "function"
+) {
+  window.addEventListener("popstate", handleUrlChangeSignal);
+  window.addEventListener("hashchange", handleUrlChangeSignal);
+  window.addEventListener("pageshow", handleUrlChangeSignal);
+  window.addEventListener("egov-locationchange", handleUrlChangeSignal);
+}
+
+if (chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message && message.type === "egov-force-sync") {
+      handleUrlChangeSignal();
+    }
+  });
 }
 
 // storage 変更時のみメモリ状態を更新して反映

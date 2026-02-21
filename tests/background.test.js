@@ -59,6 +59,10 @@ function createBackgroundHarness(options = {}) {
     tabs: {
       query: (_query, cb) => cb(state.allTabs),
       get: (_id, cb) => cb(null),
+      sendMessage: (tabId, message, cb) => {
+        calls.push(["sendMessage", { tabId, message }]);
+        if (cb) cb();
+      },
       onActivated: events.onActivated,
       onUpdated: events.onUpdated,
       onRemoved: events.onRemoved,
@@ -104,15 +108,16 @@ async function captureUnhandledRejections(run) {
 
 test("isTargetUrl: laws/elaws のみ true", () => {
   const { context } = createBackgroundHarness();
-  assert.equal(context.isTargetUrl("https://laws.e-gov.go.jp/test"), true);
-  assert.equal(context.isTargetUrl("https://elaws.e-gov.go.jp/test"), true);
+  assert.equal(context.isTargetUrl("https://laws.e-gov.go.jp/law/test"), true);
+  assert.equal(context.isTargetUrl("https://elaws.e-gov.go.jp/law/test"), true);
+  assert.equal(context.isTargetUrl("https://laws.e-gov.go.jp/test"), false);
   assert.equal(context.isTargetUrl("https://example.com/"), false);
 });
 
 test("初期化時: 保存 highlightLevel を使って全タブのバッジを更新", () => {
   const { calls } = createBackgroundHarness({
     initialHighlightLevel: 2,
-    allTabs: [{ id: 20, url: "https://laws.e-gov.go.jp/a" }],
+    allTabs: [{ id: 20, url: "https://laws.e-gov.go.jp/law/a" }],
   });
 
   assert.deepEqual(normalize(calls), [
@@ -125,7 +130,7 @@ test("初期化時: 保存 highlightLevel を使って全タブのバッジを�
 test("初期化時: legacy decoratorEnabled=false から OFF へ移行表示", () => {
   const { calls } = createBackgroundHarness({
     initialEnabled: false,
-    allTabs: [{ id: 21, url: "https://laws.e-gov.go.jp/a" }],
+    allTabs: [{ id: 21, url: "https://laws.e-gov.go.jp/law/a" }],
   });
 
   assert.deepEqual(normalize(calls), [
@@ -137,7 +142,7 @@ test("初期化時: legacy decoratorEnabled=false から OFF へ移行表示", (
 
 test("setBadgeForTab: 対象URLは H2 バッジを設定", () => {
   const { context, calls } = createBackgroundHarness();
-  context.setBadgeForTab(7, "https://laws.e-gov.go.jp/test", 1);
+  context.setBadgeForTab(7, "https://laws.e-gov.go.jp/law/test", 1);
 
   assert.deepEqual(normalize(calls), [
     ["setPopup", { tabId: 7, popup: "src/popup.html" }],
@@ -148,7 +153,7 @@ test("setBadgeForTab: 対象URLは H2 バッジを設定", () => {
 
 test("setBadgeForTab: 対象URLは OFF バッジを設定", () => {
   const { context, calls } = createBackgroundHarness();
-  context.setBadgeForTab(8, "https://laws.e-gov.go.jp/test", 4);
+  context.setBadgeForTab(8, "https://laws.e-gov.go.jp/law/test", 4);
 
   assert.deepEqual(normalize(calls), [
     ["setPopup", { tabId: 8, popup: "src/popup.html" }],
@@ -169,8 +174,8 @@ test("setBadgeForTab: 対象外URLはバッジを消す", () => {
 
 test("setBadgeForTab: 同一状態の連続更新はスキップ", () => {
   const { context, calls } = createBackgroundHarness();
-  context.setBadgeForTab(11, "https://laws.e-gov.go.jp/test", 3);
-  context.setBadgeForTab(11, "https://laws.e-gov.go.jp/test", 3);
+  context.setBadgeForTab(11, "https://laws.e-gov.go.jp/law/test", 3);
+  context.setBadgeForTab(11, "https://laws.e-gov.go.jp/law/test", 3);
 
   assert.equal(calls.length, 3);
 });
@@ -178,7 +183,7 @@ test("setBadgeForTab: 同一状態の連続更新はスキップ", () => {
 test("commands.onCommand: toggle-decorator でレベルを循環し全タブ更新", () => {
   const { events, storageSets, calls } = createBackgroundHarness({
     initialHighlightLevel: 3,
-    allTabs: [{ id: 1, url: "https://laws.e-gov.go.jp/a" }],
+    allTabs: [{ id: 1, url: "https://laws.e-gov.go.jp/law/a" }],
   });
 
   events.onCommand.emit("toggle-decorator");
@@ -196,7 +201,7 @@ test("commands.onCommand: toggle-decorator でレベルを循環し全タブ更�
 
 test("storage.onChanged: highlightLevel 変更時に反映", () => {
   const { events, calls } = createBackgroundHarness({
-    allTabs: [{ id: 10, url: "https://laws.e-gov.go.jp/a" }],
+    allTabs: [{ id: 10, url: "https://laws.e-gov.go.jp/law/a" }],
   });
 
   events.onStorageChanged.emit(
@@ -213,7 +218,7 @@ test("storage.onChanged: highlightLevel 変更時に反映", () => {
 
 test("storage.onChanged: legacy decoratorEnabled 変更も反映", () => {
   const { events, calls } = createBackgroundHarness({
-    allTabs: [{ id: 12, url: "https://laws.e-gov.go.jp/a" }],
+    allTabs: [{ id: 12, url: "https://laws.e-gov.go.jp/law/a" }],
   });
 
   events.onStorageChanged.emit(
@@ -233,23 +238,46 @@ test("tabs.onUpdated: loading でキャッシュを破棄し complete で再描�
     initialHighlightLevel: 1,
   });
 
-  context.setBadgeForTab(40, "https://laws.e-gov.go.jp/a", 1);
+  context.setBadgeForTab(40, "https://laws.e-gov.go.jp/law/a", 1);
   events.onUpdated.emit(
     40,
     { status: "loading" },
-    { url: "https://laws.e-gov.go.jp/a" },
+    { url: "https://laws.e-gov.go.jp/law/a" },
   );
   events.onUpdated.emit(
     40,
     { status: "complete" },
-    { url: "https://laws.e-gov.go.jp/a" },
+    { url: "https://laws.e-gov.go.jp/law/a" },
   );
 
-  assert.deepEqual(normalize(calls.slice(-3)), [
-    ["setPopup", { tabId: 40, popup: "src/popup.html" }],
-    ["setBadgeText", { tabId: 40, text: "H2" }],
-    ["setBadgeBackgroundColor", { tabId: 40, color: "#d93025" }],
-  ]);
+  const normalizedCalls = normalize(calls);
+  assert.equal(
+    normalizedCalls.some(
+      (entry) =>
+        entry[0] === "setPopup" &&
+        entry[1].tabId === 40 &&
+        entry[1].popup === "src/popup.html",
+    ),
+    true,
+  );
+  assert.equal(
+    normalizedCalls.some(
+      (entry) =>
+        entry[0] === "setBadgeText" &&
+        entry[1].tabId === 40 &&
+        entry[1].text === "H2",
+    ),
+    true,
+  );
+  assert.equal(
+    normalizedCalls.some(
+      (entry) =>
+        entry[0] === "setBadgeBackgroundColor" &&
+        entry[1].tabId === 40 &&
+        entry[1].color === "#d93025",
+    ),
+    true,
+  );
 });
 
 test("runtime.onMessage: content 初期化通知で送信元タブを更新", () => {
@@ -259,7 +287,7 @@ test("runtime.onMessage: content 初期化通知で送信元タブを更新", ()
 
   events.onMessage.emit(
     { type: "egov-content-ready" },
-    { tab: { id: 30, url: "https://laws.e-gov.go.jp/a" } },
+    { tab: { id: 30, url: "https://laws.e-gov.go.jp/law/a" } },
   );
 
   assert.deepEqual(normalize(calls.slice(-3)), [
@@ -267,6 +295,75 @@ test("runtime.onMessage: content 初期化通知で送信元タブを更新", ()
     ["setBadgeText", { tabId: 30, text: "H1" }],
     ["setBadgeBackgroundColor", { tabId: 30, color: "#d93025" }],
   ]);
+});
+
+test("tabs.onUpdated: URL更新時に content 再同期メッセージを送る", () => {
+  const { events, calls } = createBackgroundHarness({
+    initialHighlightLevel: 0,
+  });
+
+  events.onUpdated.emit(
+    31,
+    { url: "https://laws.e-gov.go.jp/law/a" },
+    { url: "https://laws.e-gov.go.jp/law/a" },
+  );
+
+  assert.equal(
+    normalize(calls).some(
+      (entry) =>
+        entry[0] === "sendMessage" &&
+        entry[1].tabId === 31 &&
+        entry[1].message.type === "egov-force-sync",
+    ),
+    true,
+  );
+});
+
+test("tabs.onUpdated: 対象外URLでも content 再同期メッセージを送る", () => {
+  const { events, calls } = createBackgroundHarness({
+    initialHighlightLevel: 0,
+  });
+
+  events.onUpdated.emit(
+    32,
+    { url: "https://laws.e-gov.go.jp/result" },
+    { url: "https://laws.e-gov.go.jp/result" },
+  );
+
+  assert.equal(
+    normalize(calls).some(
+      (entry) =>
+        entry[0] === "sendMessage" &&
+        entry[1].tabId === 32 &&
+        entry[1].message.type === "egov-force-sync",
+    ),
+    true,
+  );
+});
+
+test("tabs.onUpdated: 同一URLへの再同期メッセージは重複送信しない", () => {
+  const { events, calls } = createBackgroundHarness({
+    initialHighlightLevel: 0,
+  });
+
+  events.onUpdated.emit(
+    33,
+    { url: "https://laws.e-gov.go.jp/law/a" },
+    { url: "https://laws.e-gov.go.jp/law/a" },
+  );
+  events.onUpdated.emit(
+    33,
+    { url: "https://laws.e-gov.go.jp/law/a" },
+    { url: "https://laws.e-gov.go.jp/law/a" },
+  );
+
+  const syncCalls = normalize(calls).filter(
+    (entry) =>
+      entry[0] === "sendMessage" &&
+      entry[1].tabId === 33 &&
+      entry[1].message.type === "egov-force-sync",
+  );
+  assert.equal(syncCalls.length, 1);
 });
 
 test("setBadgeForTab: 閉じたタブの Promise reject(No tab with id) を無視する", async () => {
@@ -317,7 +414,7 @@ test("setBadgeForTab: 閉じたタブの Promise reject(No tab with id) を無�
   loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
 
   const unhandledRejections = await captureUnhandledRejections(async () => {
-    context.setBadgeForTab(99, "https://laws.e-gov.go.jp/a", 0);
+    context.setBadgeForTab(99, "https://laws.e-gov.go.jp/law/a", 0);
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -380,7 +477,7 @@ test("setBadgeForTab: No tab with id 以外の Promise reject は console.error 
 
   loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
 
-  context.setBadgeForTab(77, "https://laws.e-gov.go.jp/a", 0);
+  context.setBadgeForTab(77, "https://laws.e-gov.go.jp/law/a", 0);
   await Promise.resolve();
   await Promise.resolve();
 
