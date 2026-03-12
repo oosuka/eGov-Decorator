@@ -1,2 +1,2 @@
 #!/usr/bin/env sh
-npx biome check --staged --no-errors-on-unmatched
+npx biome check --staged --error-on-warnings --no-errors-on-unmatched
