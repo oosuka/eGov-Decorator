@@ -302,9 +302,13 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
-chrome.runtime.onInstalled.addListener(() => {
-  saveHighlightLevel(DEFAULT_HIGHLIGHT_LEVEL);
-  refreshBadgeForAllTabs(DEFAULT_HIGHLIGHT_LEVEL);
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details?.reason === "install") {
+    saveHighlightLevel(DEFAULT_HIGHLIGHT_LEVEL);
+    refreshBadgeForAllTabs(DEFAULT_HIGHLIGHT_LEVEL);
+    return;
+  }
+  refreshBadgeForAllTabsFromStorage();
 });
 
 chrome.runtime.onStartup.addListener(() => {

@@ -138,6 +138,88 @@ function createContentContext() {
   return { context, FakeElement, FakeTextNode };
 }
 
+function createLifecycleContentContext({
+  href = "https://laws.e-gov.go.jp/law/a",
+  highlightLevel = 0,
+  body = {
+    querySelectorAll: () => [],
+  },
+} = {}) {
+  const rafQueue = [];
+  const observerCalls = [];
+  const windowListeners = new Map();
+
+  const fakeDocument = {
+    readyState: "complete",
+    body,
+    documentElement: { style: { setProperty: () => {} } },
+    addEventListener: () => {},
+    querySelectorAll: () => [],
+    createElement: (name) => new FakeElement(name),
+    createTextNode: (text) => new FakeTextNode(text),
+    createDocumentFragment: () => new FakeDocumentFragment(),
+    createTreeWalker: () => ({
+      nextNode: () => null,
+    }),
+    createEvent: () => ({
+      initEvent: () => {},
+    }),
+  };
+
+  const fakeWindow = {
+    location: { href },
+    history: {
+      pushState: () => {},
+      replaceState: () => {},
+    },
+    addEventListener: (type, handler) => {
+      windowListeners.set(type, handler);
+    },
+    dispatchEvent: (event) => {
+      const handler = windowListeners.get(event.type);
+      if (handler) {
+        handler(event);
+      }
+    },
+    Event: function Event(type) {
+      this.type = type;
+    },
+  };
+
+  const context = {
+    window: fakeWindow,
+    document: fakeDocument,
+    NodeFilter: { SHOW_TEXT: 4 },
+    MutationObserver: class {
+      disconnect() {}
+
+      observe(root, config) {
+        observerCalls.push({ root, config });
+      }
+    },
+    requestAnimationFrame: (callback) => {
+      rafQueue.push(callback);
+      return rafQueue.length;
+    },
+    chrome: {
+      storage: {
+        local: {
+          get: (_keys, cb) => cb({ highlightLevel }),
+        },
+        onChanged: { addListener: () => {} },
+      },
+      runtime: {
+        sendMessage: () => {},
+        onMessage: { addListener: () => {} },
+      },
+    },
+    console,
+  };
+
+  loadScript(path.resolve(__dirname, "..", "src", "content.js"), context);
+  return { context, fakeDocument, fakeWindow, rafQueue, observerCalls };
+}
+
 test("applyHighlightToNode: 括弧部分のみハイライト要素化", () => {
   const { context, FakeTextNode } = createContentContext();
   const fragment = context.applyHighlightToNode(
@@ -435,4 +517,32 @@ test("setHighlightLevel: 非対象URLでは DOM を変更しない", () => {
   context.setHighlightLevel(1);
 
   assert.equal(touched, false);
+});
+
+test("初期化時: OFF では MutationObserver を開始しない", () => {
+  const { observerCalls } = createLifecycleContentContext({
+    highlightLevel: 4,
+  });
+
+  assert.equal(observerCalls.length, 0);
+});
+
+test("body 待機中に対象外 URL へ変わったら observer 開始を取り消す", () => {
+  const { context, fakeDocument, fakeWindow, rafQueue, observerCalls } =
+    createLifecycleContentContext({
+      body: null,
+    });
+
+  assert.equal(rafQueue.length, 1);
+  assert.equal(observerCalls.length, 0);
+
+  fakeWindow.location.href = "https://laws.e-gov.go.jp/result";
+  context.handleUrlChangeSignal();
+  fakeDocument.body = {
+    querySelectorAll: () => [],
+  };
+
+  rafQueue.shift()();
+
+  assert.equal(observerCalls.length, 0);
 });

@@ -154,6 +154,16 @@ test("初期化時: legacy decoratorEnabled=false から OFF へ移行表示", (
   ]);
 });
 
+test("runtime.onInstalled: update では保存済み highlightLevel を上書きしない", () => {
+  const { events, storageSets } = createBackgroundHarness({
+    initialHighlightLevel: 3,
+  });
+
+  events.onInstalled.emit({ reason: "update" });
+
+  assert.deepEqual(normalize(storageSets), []);
+});
+
 test("setBadgeForTab: 対象URLは H2 バッジを設定", () => {
   const { context, calls } = createBackgroundHarness();
   context.setBadgeForTab(7, "https://laws.e-gov.go.jp/law/test", 1);
