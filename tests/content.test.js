@@ -81,7 +81,9 @@ function walkTextNodes(root, result = []) {
     return result;
   }
   if (!root.childNodes) return result;
-  root.childNodes.forEach((child) => walkTextNodes(child, result));
+  root.childNodes.forEach((child) => {
+    walkTextNodes(child, result);
+  });
   return result;
 }
 
@@ -91,7 +93,9 @@ function collectHighlightTexts(root, result = []) {
     result.push(root.textContent);
   }
   if (!root.childNodes) return result;
-  root.childNodes.forEach((child) => collectHighlightTexts(child, result));
+  root.childNodes.forEach((child) => {
+    collectHighlightTexts(child, result);
+  });
   return result;
 }
 

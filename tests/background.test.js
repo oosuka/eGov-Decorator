@@ -478,7 +478,7 @@ test("setBadgeForTab: 閉じたタブの Promise reject(No tab with id) を無�
     storage: {
       local: {
         get: (_keys, cb) => cb({ highlightLevel: 0 }),
-        set: (_items, cb) => cb && cb(),
+        set: (_items, cb) => cb?.(),
       },
       onChanged: createEvent(),
     },
@@ -546,7 +546,7 @@ test("setBadgeForTab: No tab with id 以外の Promise reject は console.error 
     storage: {
       local: {
         get: (_keys, cb) => cb({ highlightLevel: 0 }),
-        set: (_items, cb) => cb && cb(),
+        set: (_items, cb) => cb?.(),
       },
       onChanged: createEvent(),
     },
@@ -627,7 +627,7 @@ test("setBadgeForTab: 非同期 reject 確定前でも同一状態の再試行�
     storage: {
       local: {
         get: (_keys, cb) => cb({ highlightLevel: 0 }),
-        set: (_items, cb) => cb && cb(),
+        set: (_items, cb) => cb?.(),
       },
       onChanged: createEvent(),
     },
@@ -689,7 +689,7 @@ test("setBadgeForTab: 同期 throw(No tab with id) 時にキャッシュを残�
     storage: {
       local: {
         get: (_keys, cb) => cb({ highlightLevel: 0 }),
-        set: (_items, cb) => cb && cb(),
+        set: (_items, cb) => cb?.(),
       },
       onChanged: createEvent(),
     },

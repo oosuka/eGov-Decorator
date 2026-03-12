@@ -81,7 +81,7 @@
   - `isDecoratorEnabled` の既定有効扱い
   - 非対象URLで `setHighlightLevel` が DOM を変更しないこと
 
-現在の単体テスト件数は 45 件です（`npm run test`）。
+現在の単体テスト件数は 48 件です（`npm run test`）。
 
 ### `options.test.js`
 
@@ -114,5 +114,5 @@ npm run test
 ```
 
 ```bash
-npm run lint
+npm run check
 ```

@@ -277,8 +277,8 @@ function buildFragmentFromMask(text, highlightMask) {
 
 function fragmentHasHighlight(fragment) {
   if (!fragment || !fragment.childNodes) return false;
-  return Array.from(fragment.childNodes).some(
-    (child) => child.classList && child.classList.contains("egov-highlight"),
+  return Array.from(fragment.childNodes).some((child) =>
+    child.classList?.contains("egov-highlight"),
   );
 }
 
@@ -291,9 +291,9 @@ function shouldSkipTextNodeByParentName(parentName) {
 }
 
 function isInsideHighlightElement(node) {
-  let current = node && node.parentNode;
+  let current = node?.parentNode;
   while (current) {
-    if (current.classList && current.classList.contains("egov-highlight")) {
+    if (current.classList?.contains("egov-highlight")) {
       return true;
     }
     current = current.parentNode;
@@ -302,7 +302,7 @@ function isInsideHighlightElement(node) {
 }
 
 function isHighlightableTextNode(node) {
-  const parent = node && node.parentNode;
+  const parent = node?.parentNode;
   if (!parent) return false;
 
   const parentName = parent.nodeName.toLowerCase();
@@ -323,22 +323,22 @@ function collectHighlightableTextNodes(root) {
     false,
   );
   const nodes = [];
-  let node;
-
-  while ((node = walker.nextNode())) {
+  let node = walker.nextNode();
+  while (node) {
     if (isHighlightableTextNode(node)) {
       nodes.push(node);
     }
+    node = walker.nextNode();
   }
 
   return nodes;
 }
 
 function getCrossNodeContainer(node) {
-  let current = node && node.parentNode;
+  let current = node?.parentNode;
 
   while (current) {
-    const tagName = current.nodeName && current.nodeName.toLowerCase();
+    const tagName = current.nodeName?.toLowerCase();
     if (UNSAFE_CROSS_NODE_TAGS.has(tagName)) {
       return null;
     }
@@ -719,7 +719,7 @@ if (
   window.addEventListener("egov-locationchange", handleUrlChangeSignal);
 }
 
-if (chrome.runtime && chrome.runtime.onMessage) {
+if (chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message) => {
     if (message && message.type === "egov-force-sync") {
       handleUrlChangeSignal();
