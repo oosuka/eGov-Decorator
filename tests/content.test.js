@@ -145,18 +145,36 @@ function createContentContext() {
 function createLifecycleContentContext({
   href = "https://laws.e-gov.go.jp/law/a",
   highlightLevel = 0,
+  storageResult = { highlightLevel },
   body = {
     querySelectorAll: () => [],
   },
+  withRuntime = true,
+  sendMessageThrows = false,
+  withWindowEvent = true,
+  withWindowDispatchEvent = true,
+  withDocumentCreateEvent = true,
+  onObserve = null,
 } = {}) {
   const rafQueue = [];
   const observerCalls = [];
+  const observerDisconnects = [];
+  const dispatchedEvents = [];
+  const sentMessages = [];
+  const styleCalls = [];
   const windowListeners = new Map();
+  let storageChangedListener = null;
+  let runtimeMessageListener = null;
+  let observerCallback = null;
 
   const fakeDocument = {
     readyState: "complete",
     body,
-    documentElement: { style: { setProperty: () => {} } },
+    documentElement: {
+      style: {
+        setProperty: (...args) => styleCalls.push(args),
+      },
+    },
     addEventListener: () => {},
     querySelectorAll: () => [],
     createElement: (name) => new FakeElement(name),
@@ -165,36 +183,75 @@ function createLifecycleContentContext({
     createTreeWalker: () => ({
       nextNode: () => null,
     }),
-    createEvent: () => ({
-      initEvent: () => {},
-    }),
+    createEvent: withDocumentCreateEvent
+      ? () => ({
+          type: "",
+          initEvent(type) {
+            this.type = type;
+          },
+        })
+      : undefined,
   };
 
+  const fakeLocation = { href };
+  const updateHref = (nextUrl) => {
+    if (typeof nextUrl !== "string") return;
+    fakeLocation.href = new URL(nextUrl, fakeLocation.href).href;
+  };
   const fakeWindow = {
-    location: { href },
+    location: fakeLocation,
     history: {
-      pushState: () => {},
-      replaceState: () => {},
+      pushState: (_state, _unused, url) => {
+        updateHref(url);
+      },
+      replaceState: (_state, _unused, url) => {
+        updateHref(url);
+      },
     },
     addEventListener: (type, handler) => {
       windowListeners.set(type, handler);
     },
-    dispatchEvent: (event) => {
-      const handler = windowListeners.get(event.type);
-      if (handler) {
-        handler(event);
-      }
-    },
-    Event: function Event(type) {
-      this.type = type;
-    },
+    dispatchEvent: withWindowDispatchEvent
+      ? (event) => {
+          dispatchedEvents.push(event.type);
+          const handler = windowListeners.get(event.type);
+          if (handler) {
+            handler(event);
+          }
+        }
+      : undefined,
+    Event: withWindowEvent
+      ? function Event(type) {
+          this.type = type;
+        }
+      : undefined,
   };
+
+  const runtime = withRuntime
+    ? {
+        sendMessage: (message) => {
+          sentMessages.push(message);
+          if (sendMessageThrows) {
+            throw new Error("runtime sendMessage failed");
+          }
+        },
+        onMessage: {
+          addListener: (listener) => {
+            runtimeMessageListener = listener;
+          },
+        },
+      }
+    : undefined;
 
   const context = {
     window: fakeWindow,
     document: fakeDocument,
     NodeFilter: { SHOW_TEXT: 4 },
     MutationObserver: class {
+      constructor(callback) {
+        observerCallback = callback;
+      }
+
       disconnect() {}
 
       observe(root, config) {
@@ -208,20 +265,57 @@ function createLifecycleContentContext({
     chrome: {
       storage: {
         local: {
-          get: (_keys, cb) => cb({ highlightLevel }),
+          get: (_keys, cb) => cb(storageResult),
         },
-        onChanged: { addListener: () => {} },
+        onChanged: {
+          addListener: (listener) => {
+            storageChangedListener = listener;
+          },
+        },
       },
-      runtime: {
-        sendMessage: () => {},
-        onMessage: { addListener: () => {} },
-      },
+      runtime,
     },
     console,
   };
 
+  context.MutationObserver = class {
+    constructor(callback) {
+      observerCallback = callback;
+    }
+
+    disconnect() {
+      observerDisconnects.push(true);
+    }
+
+    observe(root, config) {
+      if (typeof onObserve === "function") {
+        onObserve(context);
+      }
+      observerCalls.push({ root, config });
+    }
+  };
+
   loadScript(path.resolve(__dirname, "..", "src", "content.js"), context);
-  return { context, fakeDocument, fakeWindow, rafQueue, observerCalls };
+  return {
+    context,
+    fakeDocument,
+    fakeWindow,
+    rafQueue,
+    observerCalls,
+    observerDisconnects,
+    dispatchedEvents,
+    sentMessages,
+    styleCalls,
+    emitStorageChange: (changes, area = "local") => {
+      storageChangedListener?.(changes, area);
+    },
+    emitRuntimeMessage: (message) => {
+      runtimeMessageListener?.(message);
+    },
+    triggerObserver: () => {
+      observerCallback?.();
+    },
+  };
 }
 
 test("applyHighlightToNode: 括弧部分のみハイライト要素化", () => {
@@ -425,6 +519,19 @@ test("getCrossNodeContainer: 安全/危険タグの判定", () => {
   assert.equal(context.getCrossNodeContainer(bodyOnlyText), null);
 });
 
+test("getCrossNodeContainer: body 直下まで辿ったら null", () => {
+  const { context, FakeElement, FakeTextNode } = createContentContext();
+  const body = new FakeElement("body");
+  context.document.body = body;
+
+  const span = new FakeElement("span");
+  const text = new FakeTextNode("x");
+  span.appendChild(text);
+  body.appendChild(span);
+
+  assert.equal(context.getCrossNodeContainer(text), null);
+});
+
 test("collectDecoratableTextNodes: script/style と既存 highlight 内を除外", () => {
   const { context, FakeElement, FakeTextNode } = createContentContext();
 
@@ -549,4 +656,316 @@ test("body 待機中に対象外 URL へ変わったら observer 開始を取り
   rafQueue.shift()();
 
   assert.equal(observerCalls.length, 0);
+});
+
+test("normalizeHighlightLevel: 範囲外は null", () => {
+  const { context } = createContentContext();
+
+  assert.equal(context.normalizeHighlightLevel(-1), null);
+  assert.equal(context.normalizeHighlightLevel(99), null);
+});
+
+test("applyColorChanges: 色変更時だけ CSS 変数を更新する", () => {
+  const { styleCalls, emitStorageChange } = createLifecycleContentContext();
+  const initialCallCount = styleCalls.length;
+
+  emitStorageChange({ other: { newValue: 1 } });
+  assert.equal(styleCalls.length, initialCallCount);
+
+  emitStorageChange({
+    highlightBgColor: { newValue: "#123456" },
+    highlightTextColor: { newValue: "#abcdef" },
+  });
+
+  assert.deepEqual(styleCalls.slice(-2), [
+    ["--egov-highlight-bg", "#123456"],
+    ["--egov-highlight-text", "#abcdef"],
+  ]);
+});
+
+test("notifyContentReady: runtime 不在時は何もしない", () => {
+  const { context } = createLifecycleContentContext({
+    withRuntime: false,
+  });
+
+  assert.doesNotThrow(() => {
+    context.notifyContentReady();
+  });
+});
+
+test("notifyContentReady: sendMessage 例外を握りつぶす", () => {
+  const { context } = createLifecycleContentContext({
+    sendMessageThrows: true,
+  });
+
+  assert.doesNotThrow(() => {
+    context.notifyContentReady();
+  });
+});
+
+test("buildHighlightFragmentWithDepth: 空文字では空 fragment を返す", () => {
+  const { context } = createContentContext();
+  const result = context.buildHighlightFragmentWithDepth("", 1, 2);
+
+  assert.equal(result.docFragment.childNodes.length, 0);
+  assert.equal(result.endDepth, 2);
+  assert.equal(result.hasHighlight, false);
+});
+
+test("buildFragmentFromMask: 空文字では空 fragment を返す", () => {
+  const { context } = createContentContext();
+  const result = context.buildFragmentFromMask("", []);
+
+  assert.equal(result.docFragment.childNodes.length, 0);
+  assert.equal(result.hasHighlight, false);
+});
+
+test("applyHighlightInContainer: テキストノードが無ければ何もしない", () => {
+  const { context, FakeElement } = createContentContext();
+  const root = new FakeElement("div");
+
+  assert.doesNotThrow(() => {
+    context.applyHighlightInContainer(root, 1);
+  });
+});
+
+test("applyHighlightInContainer: 括弧が無い場合は置換しない", () => {
+  const { context, FakeElement, FakeTextNode } = createContentContext();
+  const root = new FakeElement("div");
+  const p = new FakeElement("p");
+  const text = new FakeTextNode("括弧なし");
+  p.appendChild(text);
+  root.appendChild(p);
+
+  context.applyHighlightInContainer(root, 1);
+
+  assert.deepEqual(collectHighlightTexts(root), []);
+  assert.equal(p.childNodes[0], text);
+});
+
+test("applyHighlightInContainer: 単一ノードの括弧を置換する", () => {
+  const { context, FakeElement, FakeTextNode } = createContentContext();
+  const root = new FakeElement("div");
+  const p = new FakeElement("p");
+  p.appendChild(new FakeTextNode("前文（A）後文"));
+  root.appendChild(p);
+
+  context.applyHighlightInContainer(root, 1);
+
+  assert.deepEqual(collectHighlightTexts(root), ["（A）"]);
+});
+
+test("applyHighlightInContainer: 非クロスノード経路でも括弧を置換する", () => {
+  const { context, FakeElement, FakeTextNode } = createContentContext();
+  const root = new FakeElement("div");
+  const table = new FakeElement("table");
+  const td = new FakeElement("td");
+  td.appendChild(new FakeTextNode("前文（A）後文"));
+  table.appendChild(td);
+  root.appendChild(table);
+
+  context.applyHighlightInContainer(root, 1);
+
+  assert.deepEqual(collectHighlightTexts(root), ["（A）"]);
+});
+
+test("applyHighlightInContainer: コンテナ内に括弧なしの塊があっても他コンテナの処理を続ける", () => {
+  const { context, FakeElement, FakeTextNode } = createContentContext();
+  const root = new FakeElement("div");
+
+  const p1 = new FakeElement("p");
+  p1.appendChild(new FakeTextNode("（"));
+  p1.appendChild(new FakeTextNode("A）"));
+
+  const p2 = new FakeElement("p");
+  p2.appendChild(new FakeTextNode("括弧"));
+  p2.appendChild(new FakeTextNode("なし"));
+
+  root.appendChild(p1);
+  root.appendChild(p2);
+
+  context.applyHighlightInContainer(root, 1);
+
+  assert.deepEqual(collectHighlightTexts(root), ["（", "A）"]);
+});
+
+test("applyHighlightInRoot: 現在レベルでルートに反映する", () => {
+  const { context, FakeElement, FakeTextNode } = createContentContext();
+  const root = new FakeElement("div");
+  const p = new FakeElement("p");
+  p.appendChild(new FakeTextNode("x（A）y"));
+  root.appendChild(p);
+
+  context.applyHighlightInRoot(root);
+
+  assert.deepEqual(collectHighlightTexts(root), ["（A）"]);
+});
+
+test("初期化時: 対象 URL では observer 開始と content-ready 通知を行う", () => {
+  const { observerCalls, sentMessages } = createLifecycleContentContext();
+
+  assert.equal(observerCalls.length, 2);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].type, "egov-content-ready");
+});
+
+test("applyHighlight: observer を一時停止して再開する", () => {
+  const { context, observerCalls, observerDisconnects } =
+    createLifecycleContentContext();
+  const initialObserveCount = observerCalls.length;
+  const initialDisconnectCount = observerDisconnects.length;
+
+  context.applyHighlight();
+
+  assert.equal(observerDisconnects.length, initialDisconnectCount + 1);
+  assert.equal(observerCalls.length, initialObserveCount + 1);
+});
+
+test("MutationObserver: refresh は 1 フレームに集約される", () => {
+  const { triggerObserver, rafQueue, observerCalls, observerDisconnects } =
+    createLifecycleContentContext();
+  const initialObserveCount = observerCalls.length;
+  const initialDisconnectCount = observerDisconnects.length;
+
+  triggerObserver();
+  triggerObserver();
+
+  assert.equal(rafQueue.length, 1);
+  rafQueue.shift()();
+
+  assert.equal(observerDisconnects.length, initialDisconnectCount + 1);
+  assert.equal(observerCalls.length, initialObserveCount + 1);
+});
+
+test("setHighlightLevel: 対象 URL では既存 highlight を外して再適用する", () => {
+  let replaceCalls = 0;
+  let normalizeCalls = 0;
+  const parent = {
+    replaceChild: () => {
+      replaceCalls += 1;
+    },
+    normalize: () => {
+      normalizeCalls += 1;
+    },
+  };
+  const span = { parentNode: parent, textContent: "（A）" };
+  const body = {
+    querySelectorAll: () => [],
+  };
+  const { context } = createLifecycleContentContext({
+    body,
+  });
+
+  context.document.querySelectorAll = () => [span];
+  context.setHighlightLevel(1);
+
+  assert.equal(replaceCalls, 1);
+  assert.equal(normalizeCalls, 1);
+});
+
+test("syncDecoratorByUrl: 対象外 URL への遷移で observer を停止する", () => {
+  const { context, fakeWindow, observerDisconnects } =
+    createLifecycleContentContext();
+  const initialDisconnectCount = observerDisconnects.length;
+
+  fakeWindow.location.href = "https://example.com/";
+  context.syncDecoratorByUrl(true);
+
+  assert.equal(observerDisconnects.length, initialDisconnectCount + 1);
+});
+
+test("dispatchUrlChangeEvent: Event コンストラクタが無ければ createEvent を使う", () => {
+  const { context, dispatchedEvents } = createLifecycleContentContext({
+    withWindowEvent: false,
+  });
+
+  context.dispatchUrlChangeEvent();
+
+  assert.equal(dispatchedEvents.at(-1), "egov-locationchange");
+});
+
+test("dispatchUrlChangeEvent: dispatchEvent が無ければ何もしない", () => {
+  const { context } = createLifecycleContentContext({
+    withWindowDispatchEvent: false,
+  });
+
+  assert.doesNotThrow(() => {
+    context.dispatchUrlChangeEvent();
+  });
+});
+
+test("history.pushState / replaceState: URL 変化イベントを発火して再同期する", () => {
+  const { fakeWindow, sentMessages, dispatchedEvents, observerDisconnects } =
+    createLifecycleContentContext();
+  const initialMessageCount = sentMessages.length;
+  const initialDisconnectCount = observerDisconnects.length;
+
+  fakeWindow.history.pushState({}, "", "/law/b");
+  assert.equal(fakeWindow.location.href, "https://laws.e-gov.go.jp/law/b");
+
+  fakeWindow.history.replaceState({}, "", "https://example.com/");
+
+  assert.equal(dispatchedEvents.includes("egov-locationchange"), true);
+  assert.equal(sentMessages.length, initialMessageCount + 1);
+  assert.equal(observerDisconnects.length, initialDisconnectCount + 2);
+  assert.equal(fakeWindow.location.href, "https://example.com/");
+});
+
+test("runtime.onMessage: egov-force-sync で再同期する", () => {
+  const { emitRuntimeMessage, sentMessages } = createLifecycleContentContext();
+  const initialMessageCount = sentMessages.length;
+
+  emitRuntimeMessage({ type: "egov-force-sync" });
+
+  assert.equal(sentMessages.length, initialMessageCount + 1);
+});
+
+test("storage.onChanged: area が local 以外なら無視する", () => {
+  const { styleCalls, emitStorageChange } = createLifecycleContentContext();
+  const initialCallCount = styleCalls.length;
+
+  emitStorageChange({ highlightBgColor: { newValue: "#000000" } }, "sync");
+
+  assert.equal(styleCalls.length, initialCallCount);
+});
+
+test("storage.onChanged: highlightLevel の更新を反映する", () => {
+  let replaceCalls = 0;
+  const parent = {
+    replaceChild: () => {
+      replaceCalls += 1;
+    },
+    normalize: () => {},
+  };
+  const span = { parentNode: parent, textContent: "（A）" };
+  const { emitStorageChange, context } = createLifecycleContentContext();
+  context.document.querySelectorAll = () => [span];
+
+  emitStorageChange({ highlightLevel: { newValue: 2 } });
+
+  assert.equal(replaceCalls, 1);
+});
+
+test("storage.onChanged: 不正な highlightLevel は legacy decoratorEnabled を使う", () => {
+  const { emitStorageChange, observerDisconnects } =
+    createLifecycleContentContext();
+  const initialDisconnectCount = observerDisconnects.length;
+
+  emitStorageChange({
+    highlightLevel: { newValue: 99 },
+    decoratorEnabled: { newValue: false },
+  });
+
+  assert.equal(observerDisconnects.length, initialDisconnectCount + 1);
+});
+
+test("startObserverWhenReady: 開始直前に無効化されたら onReady を中断する", () => {
+  const { observerCalls, sentMessages } = createLifecycleContentContext({
+    onObserve: (context) => {
+      context.setHighlightLevel(4);
+    },
+  });
+
+  assert.equal(observerCalls.length, 1);
+  assert.deepEqual(sentMessages, []);
 });

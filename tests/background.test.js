@@ -37,28 +37,39 @@ function createBackgroundHarness(options = {}) {
       decoratorEnabled: options.initialEnabled,
     },
     allTabs: options.allTabs ?? [],
+    activeTabs: options.activeTabs ?? options.allTabs ?? [],
+    tabsById: options.tabsById ?? {},
   };
 
-  const actionApi = {
+  const actionApi = options.actionApi ?? {
     setPopup: (payload) => calls.push(["setPopup", payload]),
     setBadgeText: (payload) => calls.push(["setBadgeText", payload]),
     setBadgeBackgroundColor: (payload) =>
       calls.push(["setBadgeBackgroundColor", payload]),
   };
 
+  const runtime = {
+    onInstalled: events.onInstalled,
+    onStartup: events.onStartup,
+    onMessage: events.onMessage,
+    lastError: null,
+  };
+
   const chrome = {
     action: actionApi,
     browserAction: null,
     commands: { onCommand: events.onCommand },
-    runtime: {
-      onInstalled: events.onInstalled,
-      onStartup: events.onStartup,
-      onMessage: events.onMessage,
-      lastError: null,
-    },
+    runtime,
     tabs: {
-      query: (_query, cb) => cb(state.allTabs),
-      get: (_id, cb) => cb(null),
+      query: (query, cb) =>
+        cb(query?.active ? state.activeTabs : state.allTabs),
+      get: (id, cb) => {
+        runtime.lastError = options.tabsGetLastError
+          ? { message: options.tabsGetLastError }
+          : null;
+        cb(state.tabsById[id] ?? null);
+        runtime.lastError = null;
+      },
       sendMessage: (tabId, message, cb) => {
         calls.push(["sendMessage", { tabId, message }]);
         if (!cb) return;
@@ -95,7 +106,11 @@ function createBackgroundHarness(options = {}) {
     },
   };
 
-  const context = { chrome, Map, console };
+  const context = {
+    chrome,
+    Map,
+    console: options.console ?? console,
+  };
   loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
 
   return { context, events, calls, storageSets };
@@ -705,4 +720,274 @@ test("setBadgeForTab: 同期 throw(No tab with id) 時にキャッシュを残�
     { tabId: 55, text: "" },
     { tabId: 55, text: "" },
   ]);
+});
+
+test("getStoredHighlightLevel: 範囲外の highlightLevel は既定値へフォールバック", () => {
+  const { context } = createBackgroundHarness();
+
+  assert.equal(context.getStoredHighlightLevel({ highlightLevel: 99 }), 0);
+  assert.equal(
+    context.getStoredHighlightLevel({
+      highlightLevel: -1,
+      decoratorEnabled: false,
+    }),
+    4,
+  );
+});
+
+test("getNextHighlightLevel: 範囲外レベルは H1 に戻る", () => {
+  const { context } = createBackgroundHarness();
+
+  assert.equal(context.getNextHighlightLevel(99), 0);
+  assert.equal(context.getNextHighlightLevel(-1), 0);
+});
+
+test("setBadgeForTab: setPopup の同期例外は console.error 後も後続処理を続ける", () => {
+  const errors = [];
+  const calls = [];
+  const { context } = createBackgroundHarness({
+    actionApi: {
+      setPopup: (payload) => {
+        calls.push(["setPopup", payload]);
+        throw new Error(`Unexpected popup error for tab ${payload.tabId}`);
+      },
+      setBadgeText: (payload) => calls.push(["setBadgeText", payload]),
+      setBadgeBackgroundColor: (payload) =>
+        calls.push(["setBadgeBackgroundColor", payload]),
+    },
+    console: {
+      error: (...args) => errors.push(args.map(String).join(" ")),
+      log: () => {},
+      warn: () => {},
+    },
+  });
+
+  context.setBadgeForTab(88, "https://laws.e-gov.go.jp/law/a", 0);
+
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 88, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 88, text: "H1" }],
+    ["setBadgeBackgroundColor", { tabId: 88, color: "#d93025" }],
+  ]);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /Unexpected popup error for tab 88/);
+});
+
+test("setBadgeForTab: 非同期成功時は確定後に同一状態を再利用する", async () => {
+  const calls = [];
+  const resolvedActionApi = {
+    setPopup: (payload) => {
+      calls.push(["setPopup", payload]);
+      return Promise.resolve();
+    },
+    setBadgeText: (payload) => {
+      calls.push(["setBadgeText", payload]);
+      return Promise.resolve();
+    },
+    setBadgeBackgroundColor: (payload) => {
+      calls.push(["setBadgeBackgroundColor", payload]);
+      return Promise.resolve();
+    },
+  };
+  const { context } = createBackgroundHarness({ actionApi: resolvedActionApi });
+
+  context.setBadgeForTab(89, "https://laws.e-gov.go.jp/law/a", 1);
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  context.setBadgeForTab(89, "https://laws.e-gov.go.jp/law/a", 1);
+
+  assert.equal(calls.length, 3);
+});
+
+test("setBadgeForTab: setPopup の No tab with id 同期 throw では後続を呼ばない", () => {
+  const calls = [];
+  const { context } = createBackgroundHarness({
+    actionApi: {
+      setPopup: (payload) => {
+        calls.push(["setPopup", payload]);
+        throw new Error(`No tab with id: ${payload.tabId}.`);
+      },
+      setBadgeText: () => {
+        throw new Error("should not be called");
+      },
+      setBadgeBackgroundColor: () => {
+        throw new Error("should not be called");
+      },
+    },
+  });
+
+  context.setBadgeForTab(90, "https://example.com/", 0);
+
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 90, popup: "src/popup-disabled.html" }],
+  ]);
+});
+
+test("setBadgeForTab: setBadgeText の No tab with id 同期 throw では背景色を呼ばない", () => {
+  const calls = [];
+  const { context } = createBackgroundHarness({
+    actionApi: {
+      setPopup: (payload) => calls.push(["setPopup", payload]),
+      setBadgeText: (payload) => {
+        calls.push(["setBadgeText", payload]);
+        throw new Error(`No tab with id: ${payload.tabId}.`);
+      },
+      setBadgeBackgroundColor: () => {
+        throw new Error("should not be called");
+      },
+    },
+  });
+
+  context.setBadgeForTab(91, "https://laws.e-gov.go.jp/law/a", 0);
+
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 91, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 91, text: "H1" }],
+  ]);
+});
+
+test("setBadgeForTab: setBadgeBackgroundColor の No tab with id 同期 throw で終了する", () => {
+  const calls = [];
+  const { context } = createBackgroundHarness({
+    actionApi: {
+      setPopup: (payload) => calls.push(["setPopup", payload]),
+      setBadgeText: (payload) => calls.push(["setBadgeText", payload]),
+      setBadgeBackgroundColor: (payload) => {
+        calls.push(["setBadgeBackgroundColor", payload]);
+        throw new Error(`No tab with id: ${payload.tabId}.`);
+      },
+    },
+  });
+
+  context.setBadgeForTab(92, "https://laws.e-gov.go.jp/law/a", 0);
+
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 92, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 92, text: "H1" }],
+    ["setBadgeBackgroundColor", { tabId: 92, color: "#d93025" }],
+  ]);
+});
+
+test("storage.onChanged: 関係ない変更や area は無視する", () => {
+  const { events, calls } = createBackgroundHarness({
+    allTabs: [{ id: 93, url: "https://laws.e-gov.go.jp/law/a" }],
+  });
+
+  events.onStorageChanged.emit({ other: { newValue: 1 } }, "local");
+  events.onStorageChanged.emit({ highlightLevel: { newValue: 2 } }, "sync");
+
+  assert.equal(calls.length, 3);
+});
+
+test("runtime.onInstalled: install では初期値保存と全タブ更新を行う", () => {
+  const { events, storageSets, calls } = createBackgroundHarness({
+    allTabs: [{ id: 94, url: "https://laws.e-gov.go.jp/law/a" }],
+  });
+
+  events.onInstalled.emit({ reason: "install" });
+
+  assert.deepEqual(normalize(storageSets.at(-1)), {
+    highlightLevel: 0,
+    decoratorEnabled: true,
+  });
+  assert.deepEqual(normalize(calls.slice(-3)), [
+    ["setPopup", { tabId: 94, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 94, text: "H1" }],
+    ["setBadgeBackgroundColor", { tabId: 94, color: "#d93025" }],
+  ]);
+});
+
+test("runtime.onStartup: 保存済み設定で全タブのバッジを更新する", () => {
+  const allTabs = [];
+  const { events, calls } = createBackgroundHarness({
+    initialHighlightLevel: 2,
+    allTabs,
+  });
+
+  allTabs.push({ id: 95, url: "https://laws.e-gov.go.jp/law/a" });
+  calls.length = 0;
+  events.onStartup.emit();
+
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 95, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 95, text: "H3" }],
+    ["setBadgeBackgroundColor", { tabId: 95, color: "#d93025" }],
+  ]);
+});
+
+test("tabs.onActivated: tabs.get 成功時だけバッジを更新する", () => {
+  const successfulHarness = createBackgroundHarness({
+    initialHighlightLevel: 1,
+    tabsById: {
+      96: { id: 96, url: "https://laws.e-gov.go.jp/law/a" },
+    },
+  });
+
+  successfulHarness.events.onActivated.emit({ tabId: 96 });
+
+  assert.deepEqual(normalize(successfulHarness.calls.slice(-3)), [
+    ["setPopup", { tabId: 96, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 96, text: "H2" }],
+    ["setBadgeBackgroundColor", { tabId: 96, color: "#d93025" }],
+  ]);
+
+  const failedHarness = createBackgroundHarness({
+    initialHighlightLevel: 1,
+    tabsById: {
+      97: { id: 97, url: "https://laws.e-gov.go.jp/law/a" },
+    },
+    tabsGetLastError: "No tab",
+  });
+
+  failedHarness.calls.length = 0;
+  failedHarness.events.onActivated.emit({ tabId: 97 });
+  assert.deepEqual(normalize(failedHarness.calls), []);
+});
+
+test("tabs.onRemoved: キャッシュ破棄後は同じ状態でも再描画できる", () => {
+  const { context, events, calls } = createBackgroundHarness();
+
+  context.setBadgeForTab(98, "https://laws.e-gov.go.jp/law/a", 0);
+  calls.length = 0;
+
+  context.setBadgeForTab(98, "https://laws.e-gov.go.jp/law/a", 0);
+  assert.equal(calls.length, 0);
+
+  events.onRemoved.emit(98);
+  context.setBadgeForTab(98, "https://laws.e-gov.go.jp/law/a", 0);
+
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 98, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 98, text: "H1" }],
+    ["setBadgeBackgroundColor", { tabId: 98, color: "#d93025" }],
+  ]);
+});
+
+test("windows.onFocusChanged: フォーカス復帰時にアクティブタブを更新し NONE は無視する", () => {
+  const { events, calls } = createBackgroundHarness({
+    initialHighlightLevel: 1,
+    activeTabs: [{ id: 99, url: "https://laws.e-gov.go.jp/law/a" }],
+  });
+
+  calls.length = 0;
+  events.onFocusChanged.emit(-1);
+  assert.deepEqual(normalize(calls), []);
+
+  events.onFocusChanged.emit(1);
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 99, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 99, text: "H2" }],
+    ["setBadgeBackgroundColor", { tabId: 99, color: "#d93025" }],
+  ]);
+});
+
+test("refreshBadgeForActiveTab: アクティブタブが無ければ何もしない", () => {
+  const { context, calls } = createBackgroundHarness({
+    activeTabs: [],
+  });
+
+  calls.length = 0;
+  context.refreshBadgeForActiveTab();
+
+  assert.deepEqual(normalize(calls), []);
 });
