@@ -265,7 +265,7 @@ function requestContentSyncForTab(tabId, url) {
 
 function refreshBadgeForActiveTab() {
   chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
-    const tab = tabs && tabs[0];
+    const tab = tabs?.[0];
     if (!tab || tab.id == null) return;
     refreshBadgeForTab(tab.id, tab.url);
   });
@@ -286,7 +286,7 @@ function refreshBadgeForAllTabsFromStorage() {
 
 function handleContentReadyMessage(message, sender) {
   if (!message || message.type !== "egov-content-ready") return;
-  const senderTab = sender && sender.tab;
+  const senderTab = sender?.tab;
   if (!senderTab || senderTab.id == null) return;
   refreshBadgeForTab(senderTab.id, senderTab.url);
 }
@@ -302,9 +302,13 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
-chrome.runtime.onInstalled.addListener(() => {
-  saveHighlightLevel(DEFAULT_HIGHLIGHT_LEVEL);
-  refreshBadgeForAllTabs(DEFAULT_HIGHLIGHT_LEVEL);
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details?.reason === "install") {
+    saveHighlightLevel(DEFAULT_HIGHLIGHT_LEVEL);
+    refreshBadgeForAllTabs(DEFAULT_HIGHLIGHT_LEVEL);
+    return;
+  }
+  refreshBadgeForAllTabsFromStorage();
 });
 
 chrome.runtime.onStartup.addListener(() => {

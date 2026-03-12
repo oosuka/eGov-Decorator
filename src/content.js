@@ -277,9 +277,13 @@ function buildFragmentFromMask(text, highlightMask) {
 
 function fragmentHasHighlight(fragment) {
   if (!fragment || !fragment.childNodes) return false;
-  return Array.from(fragment.childNodes).some(
-    (child) => child.classList && child.classList.contains("egov-highlight"),
+  return Array.from(fragment.childNodes).some((child) =>
+    child.classList?.contains("egov-highlight"),
   );
+}
+
+function textNodeContainsBracket(node) {
+  return BRACKET_PATTERN.test(node?.nodeValue || "");
 }
 
 function shouldSkipTextNodeByParentName(parentName) {
@@ -287,9 +291,9 @@ function shouldSkipTextNodeByParentName(parentName) {
 }
 
 function isInsideHighlightElement(node) {
-  let current = node && node.parentNode;
+  let current = node?.parentNode;
   while (current) {
-    if (current.classList && current.classList.contains("egov-highlight")) {
+    if (current.classList?.contains("egov-highlight")) {
       return true;
     }
     current = current.parentNode;
@@ -298,7 +302,7 @@ function isInsideHighlightElement(node) {
 }
 
 function isHighlightableTextNode(node) {
-  const parent = node && node.parentNode;
+  const parent = node?.parentNode;
   if (!parent) return false;
 
   const parentName = parent.nodeName.toLowerCase();
@@ -319,22 +323,22 @@ function collectHighlightableTextNodes(root) {
     false,
   );
   const nodes = [];
-  let node;
-
-  while ((node = walker.nextNode())) {
+  let node = walker.nextNode();
+  while (node) {
     if (isHighlightableTextNode(node)) {
       nodes.push(node);
     }
+    node = walker.nextNode();
   }
 
   return nodes;
 }
 
 function getCrossNodeContainer(node) {
-  let current = node && node.parentNode;
+  let current = node?.parentNode;
 
   while (current) {
-    const tagName = current.nodeName && current.nodeName.toLowerCase();
+    const tagName = current.nodeName?.toLowerCase();
     if (UNSAFE_CROSS_NODE_TAGS.has(tagName)) {
       return null;
     }
@@ -355,9 +359,11 @@ function applyHighlightInContainer(root, minHighlightDepth) {
   if (nodes.length === 0) {
     return;
   }
-  if (collectDecoratableTextNodes(nodes).length === 0) {
+  const decoratableNodes = collectDecoratableTextNodes(nodes);
+  if (decoratableNodes.length === 0) {
     return;
   }
+  const decoratableNodeSet = new Set(decoratableNodes);
 
   const groupedByContainer = new Map();
 
@@ -368,7 +374,7 @@ function applyHighlightInContainer(root, minHighlightDepth) {
     const container = getCrossNodeContainer(node);
     const isCrossNodeEnabled = !!container;
     if (!isCrossNodeEnabled) {
-      if (!BRACKET_PATTERN.test(node.nodeValue || "")) {
+      if (!decoratableNodeSet.has(node)) {
         return;
       }
       const highlightedContent = applyHighlightToNode(node, minHighlightDepth);
@@ -420,7 +426,7 @@ function collectDecoratableTextNodes(rootOrNodes) {
   const nodes = Array.isArray(rootOrNodes)
     ? rootOrNodes
     : collectHighlightableTextNodes(rootOrNodes);
-  return nodes.filter((node) => BRACKET_PATTERN.test(node.nodeValue || ""));
+  return nodes.filter(textNodeContainsBracket);
 }
 
 function applyHighlightInRoot(root) {
@@ -450,7 +456,12 @@ function withObserverPaused(callback) {
   callback();
 
   const nextRoot = getObserverRoot();
-  if (wasObserving && nextRoot) {
+  if (
+    wasObserving &&
+    nextRoot &&
+    isCurrentUrlTarget &&
+    isHighlightEnabled(currentHighlightLevel)
+  ) {
     observer.observe(nextRoot, observerConfig);
     isObserving = true;
     observerRoot = nextRoot;
@@ -498,6 +509,7 @@ const observerConfig = {
 let currentHighlightLevel = DEFAULT_HIGHLIGHT_LEVEL;
 let isObserving = false;
 let scheduled = false;
+let observerStartToken = 0;
 
 // 変更通知は1フレームにまとめ、全体再走査の回数を抑える
 function scheduleHighlightRefresh() {
@@ -543,8 +555,24 @@ function getObserverRoot() {
   return document.body || null;
 }
 
-function startObserverWhenReady(onReady) {
+function stopObserver() {
+  if (isObserving) {
+    observer.disconnect();
+  }
+  isObserving = false;
+  observerRoot = null;
+}
+
+function startObserverWhenReady(startToken, onReady) {
   const root = getObserverRoot();
+  if (
+    startToken !== observerStartToken ||
+    !isCurrentUrlTarget ||
+    !isHighlightEnabled(currentHighlightLevel)
+  ) {
+    stopObserver();
+    return;
+  }
   if (root) {
     if (!isObserving || observerRoot !== root) {
       observer.disconnect();
@@ -559,7 +587,7 @@ function startObserverWhenReady(onReady) {
   }
 
   requestAnimationFrame(() => {
-    startObserverWhenReady(onReady);
+    startObserverWhenReady(startToken, onReady);
   });
 }
 
@@ -575,26 +603,33 @@ function syncDecoratorByUrl(forceRefresh = false) {
   if (!forceRefresh && !urlChanged && nextIsTarget === isCurrentUrlTarget)
     return;
 
+  observerStartToken += 1;
+  const startToken = observerStartToken;
   lastKnownUrl = nextUrl;
   isCurrentUrlTarget = nextIsTarget;
 
   if (!isCurrentUrlTarget) {
+    stopObserver();
     removeHighlight();
-    if (isObserving) {
-      observer.disconnect();
-      isObserving = false;
-      observerRoot = null;
-    }
     return;
   }
 
-  startObserverWhenReady(() => {
-    if (!isCurrentUrlTarget) return;
-    if (isHighlightEnabled(currentHighlightLevel)) {
-      applyHighlight();
-    } else {
-      removeHighlight();
+  if (!isHighlightEnabled(currentHighlightLevel)) {
+    stopObserver();
+    removeHighlight();
+    notifyContentReady();
+    return;
+  }
+
+  startObserverWhenReady(startToken, () => {
+    if (
+      startToken !== observerStartToken ||
+      !isCurrentUrlTarget ||
+      !isHighlightEnabled(currentHighlightLevel)
+    ) {
+      return;
     }
+    applyHighlight();
     notifyContentReady();
   });
 }
@@ -684,7 +719,7 @@ if (
   window.addEventListener("egov-locationchange", handleUrlChangeSignal);
 }
 
-if (chrome.runtime && chrome.runtime.onMessage) {
+if (chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message) => {
     if (message && message.type === "egov-force-sync") {
       handleUrlChangeSignal();

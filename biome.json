@@ -1,0 +1,61 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": true
+  },
+  "formatter": {
+    "useEditorconfig": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedVariables": "error"
+      },
+      "style": {
+        "useConst": "error"
+      }
+    }
+  },
+  "javascript": {
+    "globals": [
+      "chrome",
+      "document",
+      "window",
+      "location",
+      "MutationObserver",
+      "NodeFilter",
+      "requestAnimationFrame",
+      "setTimeout",
+      "clearTimeout",
+      "console",
+      "Map",
+      "Set",
+      "WeakSet",
+      "Promise"
+    ]
+  },
+  "overrides": [
+    {
+      "includes": ["tests/**/*.js", "tests/helpers/**/*.js"],
+      "javascript": {
+        "globals": [
+          "require",
+          "module",
+          "__dirname",
+          "process",
+          "console",
+          "setTimeout",
+          "setImmediate",
+          "Map"
+        ]
+      }
+    }
+  ]
+}

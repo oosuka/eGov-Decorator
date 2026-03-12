@@ -104,7 +104,9 @@ test("saveSettings: storage に保存しステータス表示", () => {
   ]);
   assert.equal(elements.status.textContent, "保存しました");
 
-  scheduled.forEach((fn) => fn());
+  scheduled.forEach((fn) => {
+    fn();
+  });
   assert.equal(elements.status.textContent, "");
 });
 
