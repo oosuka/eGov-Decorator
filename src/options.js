@@ -40,7 +40,8 @@ function loadSettings() {
 }
 
 function getStoredColor(result, key, defaultColor) {
-  return getColorOrDefault(result[key], defaultColor);
+  const items = result && typeof result === "object" ? result : {};
+  return getColorOrDefault(items[key], defaultColor);
 }
 
 function saveSettings(bgColor, textColor) {

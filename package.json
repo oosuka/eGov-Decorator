@@ -1,11 +1,12 @@
 {
   "name": "egov-decorator",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "private": true,
   "scripts": {
-    "test": "node --test",
     "check": "biome check . --error-on-warnings",
     "lint": "biome lint . --error-on-warnings",
+    "test": "node --test",
+    "coverage": "node --test --experimental-test-coverage",
     "fix": "biome check --write .",
     "format": "biome format --write .",
     "format:check": "biome format .",
