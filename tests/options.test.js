@@ -97,7 +97,7 @@ test("loadSettings: 保存済み色をフォームに反映", () => {
   assert.equal(elements.textColor.value, "#222222");
 });
 
-test("loadSettings: storage.get が undefined でもデフォルト色を使う", () => {
+test("loadSettings: storage.get が null でもデフォルト色を使う", () => {
   const { context, elements } = createOptionsContext({
     storageGetResult: null,
   });

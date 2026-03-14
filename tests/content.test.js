@@ -247,17 +247,6 @@ function createLifecycleContentContext({
     window: fakeWindow,
     document: fakeDocument,
     NodeFilter: { SHOW_TEXT: 4 },
-    MutationObserver: class {
-      constructor(callback) {
-        observerCallback = callback;
-      }
-
-      disconnect() {}
-
-      observe(root, config) {
-        observerCalls.push({ root, config });
-      }
-    },
     requestAnimationFrame: (callback) => {
       rafQueue.push(callback);
       return rafQueue.length;
@@ -638,7 +627,7 @@ test("初期化時: OFF では MutationObserver を開始しない", () => {
   assert.equal(observerCalls.length, 0);
 });
 
-test("初期化時: storage.get が undefined でもデフォルト設定で継続", () => {
+test("初期化時: storage.get が null でもデフォルト設定で継続", () => {
   const { observerCalls, sentMessages, styleCalls } =
     createLifecycleContentContext({
       storageResult: null,

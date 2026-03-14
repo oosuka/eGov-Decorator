@@ -174,7 +174,7 @@ test("初期化時: legacy decoratorEnabled=false から OFF へ移行表示", (
   ]);
 });
 
-test("初期化時: storage.get が undefined でもデフォルト表示で継続", () => {
+test("初期化時: storage.get が null でもデフォルト表示で継続", () => {
   const { calls } = createBackgroundHarness({
     storageGetResult: null,
     allTabs: [{ id: 22, url: "https://laws.e-gov.go.jp/law/a" }],
