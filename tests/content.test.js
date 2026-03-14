@@ -638,6 +638,20 @@ test("初期化時: OFF では MutationObserver を開始しない", () => {
   assert.equal(observerCalls.length, 0);
 });
 
+test("初期化時: storage.get が undefined でもデフォルト設定で継続", () => {
+  const { observerCalls, sentMessages, styleCalls } =
+    createLifecycleContentContext({
+      storageResult: null,
+    });
+
+  assert.equal(observerCalls.length, 2);
+  assert.equal(sentMessages.length, 1);
+  assert.deepEqual(styleCalls.slice(0, 2), [
+    ["--egov-highlight-bg", "#e6e6e6"],
+    ["--egov-highlight-text", "#ffffff"],
+  ]);
+});
+
 test("body 待機中に対象外 URL へ変わったら observer 開始を取り消す", () => {
   const { context, fakeDocument, fakeWindow, rafQueue, observerCalls } =
     createLifecycleContentContext({

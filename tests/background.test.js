@@ -95,7 +95,12 @@ function createBackgroundHarness(options = {}) {
     windows: { onFocusChanged: events.onFocusChanged, WINDOW_ID_NONE: -1 },
     storage: {
       local: {
-        get: (_keys, cb) => cb({ ...state.storage }),
+        get: (_keys, cb) =>
+          cb(
+            options.storageGetResult === undefined
+              ? { ...state.storage }
+              : options.storageGetResult,
+          ),
         set: (items, cb) => {
           storageSets.push(items);
           state.storage = { ...state.storage, ...items };
@@ -166,6 +171,19 @@ test("初期化時: legacy decoratorEnabled=false から OFF へ移行表示", (
     ["setPopup", { tabId: 21, popup: "src/popup.html" }],
     ["setBadgeText", { tabId: 21, text: "OFF" }],
     ["setBadgeBackgroundColor", { tabId: 21, color: "#188038" }],
+  ]);
+});
+
+test("初期化時: storage.get が undefined でもデフォルト表示で継続", () => {
+  const { calls } = createBackgroundHarness({
+    storageGetResult: null,
+    allTabs: [{ id: 22, url: "https://laws.e-gov.go.jp/law/a" }],
+  });
+
+  assert.deepEqual(normalize(calls), [
+    ["setPopup", { tabId: 22, popup: "src/popup.html" }],
+    ["setBadgeText", { tabId: 22, text: "H1" }],
+    ["setBadgeBackgroundColor", { tabId: 22, color: "#d93025" }],
   ]);
 });
 

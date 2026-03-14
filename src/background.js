@@ -39,11 +39,12 @@ function normalizeHighlightLevel(value) {
 }
 
 function getStoredHighlightLevel(result) {
-  const normalizedLevel = normalizeHighlightLevel(result[HIGHLIGHT_LEVEL_KEY]);
+  const items = result && typeof result === "object" ? result : {};
+  const normalizedLevel = normalizeHighlightLevel(items[HIGHLIGHT_LEVEL_KEY]);
   if (normalizedLevel != null) {
     return normalizedLevel;
   }
-  return isDecoratorEnabled(result[DECORATOR_ENABLED_KEY])
+  return isDecoratorEnabled(items[DECORATOR_ENABLED_KEY])
     ? DEFAULT_HIGHLIGHT_LEVEL
     : OFF_HIGHLIGHT_LEVEL;
 }

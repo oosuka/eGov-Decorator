@@ -23,7 +23,7 @@ class FakeElement {
   }
 }
 
-function createOptionsContext({ storedValues = {} } = {}) {
+function createOptionsContext({ storedValues = {}, storageGetResult } = {}) {
   const elements = {
     status: new FakeElement("status"),
     bgColor: new FakeElement("bgColor"),
@@ -51,7 +51,10 @@ function createOptionsContext({ storedValues = {} } = {}) {
     chrome: {
       storage: {
         local: {
-          get: (_keys, cb) => cb(storedValues),
+          get: (_keys, cb) =>
+            cb(
+              storageGetResult === undefined ? storedValues : storageGetResult,
+            ),
           set: (payload, cb) => {
             setCalls.push(payload);
             if (cb) cb();
@@ -92,6 +95,17 @@ test("loadSettings: 保存済み色をフォームに反映", () => {
 
   assert.equal(elements.bgColor.value, "#111111");
   assert.equal(elements.textColor.value, "#222222");
+});
+
+test("loadSettings: storage.get が undefined でもデフォルト色を使う", () => {
+  const { context, elements } = createOptionsContext({
+    storageGetResult: null,
+  });
+
+  context.loadSettings();
+
+  assert.equal(elements.bgColor.value, "#e6e6e6");
+  assert.equal(elements.textColor.value, "#ffffff");
 });
 
 test("saveSettings: storage に保存しステータス表示", () => {
