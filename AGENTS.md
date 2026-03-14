@@ -33,6 +33,7 @@
 - 変更は既存の実装方針に合わせ、不要な構造変更は避けてください。
 - コミットメッセージは日本語1行で記述してください。
 - コミットはできるだけ1目的1コミットにしてください。
+- リリースや配布物に関わる変更では、`manifest.json`、`package.json`、`package-lock.json` のバージョン整合を確認してください。
 - 互換性のために保持している `chrome.storage.local` のキー
   - `highlightLevel`
   - `decoratorEnabled`
@@ -44,6 +45,7 @@
 ## 確認コマンド
 
 - テスト: `npm test`
+- カバレッジ: `npm run coverage`
 - 総合チェック: `npm run check`
 - lint: `npm run lint`
 - 整形: `npm run format`
