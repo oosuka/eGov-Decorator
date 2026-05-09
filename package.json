@@ -1,6 +1,6 @@
 {
   "name": "egov-decorator",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "private": true,
   "scripts": {
     "check": "biome check . --error-on-warnings",
@@ -13,11 +13,11 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.6",
+    "@biomejs/biome": "^2.4.14",
     "husky": "^9.1.7"
   },
   "volta": {
-    "node": "24.14.0",
-    "npm": "11.9.0"
+    "node": "24.15.0",
+    "npm": "11.12.1"
   }
 }

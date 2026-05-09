@@ -129,6 +129,16 @@ input[type="color"] {
   background: #fff;
 }
 
+select {
+  min-width: 164px;
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0 8px;
+  background: #fff;
+  color: #111827;
+}
+
 .actions {
   margin-top: 12px;
   display: flex;

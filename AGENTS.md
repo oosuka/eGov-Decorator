@@ -23,7 +23,7 @@
 - 主な実装箇所:
   - `src/content.js`: ページ上のハイライト処理本体
   - `src/background.js`: バッジ更新、ショートカット、タブ同期
-  - `src/options.js` / `src/options.css`: 色設定 UI
+  - `src/options.js` / `src/options.css`: 表示設定 UI
   - `tests/*.test.js`: `node:test` ベースの単体テスト
 
 ## 作業ルール
