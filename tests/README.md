@@ -107,7 +107,7 @@
   - 既存 highlight を外して再適用すること
   - 開始直前に無効化された場合に observer 開始後処理を中断すること
 
-現在の単体テスト件数は 91 件です（`npm test`）。
+現在の単体テスト件数は 94 件です（`npm test`）。
 
 ### `options.test.js`
 
@@ -115,13 +115,15 @@
 
 - `loadSettings`:
   - 保存済み背景色/文字色の入力反映
+  - 保存済み `highlightLevel` の入力反映
+  - legacy `decoratorEnabled=false` から `OFF` への入力反映
   - `storage.get` が `null` / 非オブジェクトでもデフォルト色へフォールバック
 - `saveSettings`:
-  - storage保存
+  - 色、`highlightLevel`、legacy `decoratorEnabled` の storage 保存
   - 保存ステータス表示とクリア
 - `DOMContentLoaded` 後イベント:
   - submit で現在入力値保存
-  - reset でデフォルト色保存
+  - reset でデフォルトレベル/色保存
 
 ## Residual Gaps
 

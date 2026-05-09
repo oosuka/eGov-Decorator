@@ -9,18 +9,29 @@
   <body class="popup">
     <main class="container">
       <h1>e-Gov Decorator</h1>
-      <h2>色の設定</h2>
-      <p class="description">ハイライトの背景色と文字色を設定できます。</p>
+      <h2>表示設定</h2>
+      <p class="description">ハイライトのレベル、背景色、文字色を設定できます。</p>
 
       <form id="color-form">
         <div class="field">
+          <label for="highlightLevel">ハイライト</label>
+          <select id="highlightLevel" name="highlightLevel">
+            <option value="0">H1（1階層目から）</option>
+            <option value="1">H2（2階層目から）</option>
+            <option value="2">H3（3階層目から）</option>
+            <option value="3">H4（4階層目から）</option>
+            <option value="4">OFF</option>
+          </select>
+        </div>
+
+        <div class="field">
           <label for="bgColor">背景色</label>
-          <input id="bgColor" name="bgColor" type="color" />
+          <input id="bgColor" name="bgColor" type="color" value="#e6e6e6" />
         </div>
 
         <div class="field">
           <label for="textColor">文字色</label>
-          <input id="textColor" name="textColor" type="color" />
+          <input id="textColor" name="textColor" type="color" value="#ffffff" />
         </div>
 
         <div class="actions">
@@ -32,7 +43,7 @@
       <p id="status" class="status" aria-live="polite"></p>
 
       <h2>ハイライトレベル切替</h2>
-      <p class="description">ショートカットキーで順次切り替えできます。</p>
+      <p class="description">ポップアップまたはショートカットキーで切り替えできます。</p>
       <div class="shortcut-panel">
         <p class="shortcut-flow">H1 → H2 → H3 → H4 → OFF → H1</p>
         <p class="description shortcut-note">

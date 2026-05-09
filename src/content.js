@@ -278,7 +278,7 @@ function buildFragmentFromMask(text, highlightMask) {
 }
 
 function fragmentHasHighlight(fragment) {
-  if (!fragment || !fragment.childNodes) return false;
+  if (!fragment?.childNodes) return false;
   return Array.from(fragment.childNodes).some((child) =>
     child.classList?.contains("egov-highlight"),
   );

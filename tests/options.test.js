@@ -28,6 +28,7 @@ function createOptionsContext({ storedValues = {}, storageGetResult } = {}) {
     status: new FakeElement("status"),
     bgColor: new FakeElement("bgColor"),
     textColor: new FakeElement("textColor"),
+    highlightLevel: new FakeElement("highlightLevel"),
     "color-form": new FakeElement("color-form"),
     resetBtn: new FakeElement("resetBtn"),
   };
@@ -97,6 +98,42 @@ test("loadSettings: 保存済み色をフォームに反映", () => {
   assert.equal(elements.textColor.value, "#222222");
 });
 
+test("loadSettings: 保存済みハイライトレベルをフォームに反映", () => {
+  const { context, elements } = createOptionsContext({
+    storedValues: {
+      highlightLevel: 2,
+    },
+  });
+
+  context.loadSettings();
+
+  assert.equal(elements.highlightLevel.value, "2");
+});
+
+test("loadSettings: legacy decoratorEnabled=false は OFF としてフォームに反映", () => {
+  const { context, elements } = createOptionsContext({
+    storedValues: {
+      decoratorEnabled: false,
+    },
+  });
+
+  context.loadSettings();
+
+  assert.equal(elements.highlightLevel.value, "4");
+});
+
+test("loadSettings: 範囲外 highlightLevel はデフォルトにフォールバック", () => {
+  const { context, elements } = createOptionsContext({
+    storedValues: {
+      highlightLevel: 99,
+    },
+  });
+
+  context.loadSettings();
+
+  assert.equal(elements.highlightLevel.value, "0");
+});
+
 test("loadSettings: storage.get が null でもデフォルト色を使う", () => {
   const { context, elements } = createOptionsContext({
     storageGetResult: null,
@@ -106,15 +143,21 @@ test("loadSettings: storage.get が null でもデフォルト色を使う", () 
 
   assert.equal(elements.bgColor.value, "#e6e6e6");
   assert.equal(elements.textColor.value, "#ffffff");
+  assert.equal(elements.highlightLevel.value, "0");
 });
 
 test("saveSettings: storage に保存しステータス表示", () => {
   const { context, elements, scheduled, setCalls } = createOptionsContext();
 
-  context.saveSettings("#aaaaaa", "#bbbbbb");
+  context.saveSettings("#aaaaaa", "#bbbbbb", 3);
 
   assert.deepEqual(normalize(setCalls), [
-    { highlightBgColor: "#aaaaaa", highlightTextColor: "#bbbbbb" },
+    {
+      highlightBgColor: "#aaaaaa",
+      highlightTextColor: "#bbbbbb",
+      highlightLevel: 3,
+      decoratorEnabled: true,
+    },
   ]);
   assert.equal(elements.status.textContent, "保存しました");
 
@@ -136,6 +179,7 @@ test("DOMContentLoaded: submit で現在入力値を保存", () => {
 
   elements.bgColor.value = "#123456";
   elements.textColor.value = "#654321";
+  elements.highlightLevel.value = "4";
 
   elements["color-form"].dispatch("submit", {
     preventDefault: () => {},
@@ -144,10 +188,12 @@ test("DOMContentLoaded: submit で現在入力値を保存", () => {
   assert.deepEqual(normalize(setCalls.at(-1)), {
     highlightBgColor: "#123456",
     highlightTextColor: "#654321",
+    highlightLevel: 4,
+    decoratorEnabled: false,
   });
 });
 
-test("DOMContentLoaded: reset でデフォルト色を保存", () => {
+test("DOMContentLoaded: reset でデフォルトレベルと色を保存", () => {
   const { elements, setCalls, fireDOMContentLoaded } = createOptionsContext({
     storedValues: {
       highlightBgColor: "#010101",
@@ -163,5 +209,7 @@ test("DOMContentLoaded: reset でデフォルト色を保存", () => {
   assert.deepEqual(normalize(setCalls.at(-1)), {
     highlightBgColor: "#e6e6e6",
     highlightTextColor: "#ffffff",
+    highlightLevel: 0,
+    decoratorEnabled: true,
   });
 });
