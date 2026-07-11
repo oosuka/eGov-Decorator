@@ -1,7 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
-const { loadScript } = require("./helpers/load-script");
+const { loadScript, loadScripts } = require("./helpers/load-script");
+
+const SCRIPT_PATHS = [
+  path.resolve(__dirname, "..", "src", "settings.js"),
+  path.resolve(__dirname, "..", "src", "background.js"),
+];
 
 function createEvent() {
   let listener = null;
@@ -115,6 +120,9 @@ function createBackgroundHarness(options = {}) {
     chrome,
     Map,
     console: options.console ?? console,
+  };
+  context.importScripts = (scriptPath) => {
+    loadScript(path.resolve(__dirname, "..", "src", scriptPath), context);
   };
   loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
 
@@ -518,7 +526,7 @@ test("setBadgeForTab: 閉じたタブの Promise reject(No tab with id) を無�
   };
 
   const context = { chrome, Map, console };
-  loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
+  loadScripts(SCRIPT_PATHS, context);
 
   const unhandledRejections = await captureUnhandledRejections(async () => {
     context.setBadgeForTab(99, "https://laws.e-gov.go.jp/law/a", 0);
@@ -595,7 +603,7 @@ test("setBadgeForTab: No tab with id 以外の Promise reject は console.error 
     },
   };
 
-  loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
+  loadScripts(SCRIPT_PATHS, context);
 
   context.setBadgeForTab(77, "https://laws.e-gov.go.jp/law/a", 0);
   await new Promise((resolve) => setImmediate(resolve));
@@ -676,7 +684,7 @@ test("setBadgeForTab: 非同期 reject 確定前でも同一状態の再試行�
     },
   };
 
-  loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
+  loadScripts(SCRIPT_PATHS, context);
 
   context.setBadgeForTab(78, "https://laws.e-gov.go.jp/law/a", 0);
   context.setBadgeForTab(78, "https://laws.e-gov.go.jp/law/a", 0);
@@ -729,7 +737,7 @@ test("setBadgeForTab: 同期 throw(No tab with id) 時にキャッシュを残�
   };
 
   const context = { chrome, Map, console };
-  loadScript(path.resolve(__dirname, "..", "src", "background.js"), context);
+  loadScripts(SCRIPT_PATHS, context);
 
   context.setBadgeForTab(55, "https://example.com/", 0);
   context.setBadgeForTab(55, "https://example.com/", 0);
@@ -743,9 +751,10 @@ test("setBadgeForTab: 同期 throw(No tab with id) 時にキャッシュを残�
 test("getStoredHighlightLevel: 範囲外の highlightLevel は既定値へフォールバック", () => {
   const { context } = createBackgroundHarness();
 
-  assert.equal(context.getStoredHighlightLevel({ highlightLevel: 99 }), 0);
+  const { getStoredHighlightLevel } = context.EgovDecoratorSettings;
+  assert.equal(getStoredHighlightLevel({ highlightLevel: 99 }), 0);
   assert.equal(
-    context.getStoredHighlightLevel({
+    getStoredHighlightLevel({
       highlightLevel: -1,
       decoratorEnabled: false,
     }),

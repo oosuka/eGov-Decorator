@@ -1,20 +1,21 @@
-const DEFAULT_BG_COLOR = "#e6e6e6";
-const DEFAULT_TEXT_COLOR = "#ffffff";
-const DECORATOR_ENABLED_KEY = "decoratorEnabled";
-const HIGHLIGHT_LEVEL_KEY = "highlightLevel";
-const HIGHLIGHT_BG_COLOR_KEY = "highlightBgColor";
-const HIGHLIGHT_TEXT_COLOR_KEY = "highlightTextColor";
-const DEFAULT_HIGHLIGHT_LEVEL = 0;
-const OFF_HIGHLIGHT_LEVEL = 4;
-const MAX_HIGHLIGHT_LEVEL = OFF_HIGHLIGHT_LEVEL;
+const {
+  DEFAULT_BG_COLOR,
+  DEFAULT_TEXT_COLOR,
+  DEFAULT_HIGHLIGHT_LEVEL,
+  STORAGE_KEYS,
+  getStoredColor,
+  getStoredHighlightLevel,
+  createHighlightLevelStorage,
+} = globalThis.EgovDecoratorSettings;
+
+const DECORATOR_ENABLED_KEY = STORAGE_KEYS.decoratorEnabled;
+const HIGHLIGHT_LEVEL_KEY = STORAGE_KEYS.highlightLevel;
+const HIGHLIGHT_BG_COLOR_KEY = STORAGE_KEYS.highlightBgColor;
+const HIGHLIGHT_TEXT_COLOR_KEY = STORAGE_KEYS.highlightTextColor;
 const STATUS_CLEAR_DELAY_MS = 1500;
 
 function byId(id) {
   return document.getElementById(id);
-}
-
-function getColorOrDefault(value, defaultColor) {
-  return value || defaultColor;
 }
 
 function showStatus(message) {
@@ -54,48 +55,12 @@ function loadSettings() {
   );
 }
 
-function getStoredColor(result, key, defaultColor) {
-  const items = result && typeof result === "object" ? result : {};
-  return getColorOrDefault(items[key], defaultColor);
-}
-
-function isDecoratorEnabled(value) {
-  return value !== false;
-}
-
-function normalizeHighlightLevel(value) {
-  const level = Number(value);
-  if (!Number.isInteger(level)) return null;
-  if (level < DEFAULT_HIGHLIGHT_LEVEL || level > MAX_HIGHLIGHT_LEVEL) {
-    return null;
-  }
-  return level;
-}
-
-function getStoredHighlightLevel(result) {
-  const items = result && typeof result === "object" ? result : {};
-  const normalizedLevel = normalizeHighlightLevel(items[HIGHLIGHT_LEVEL_KEY]);
-  if (normalizedLevel != null) {
-    return normalizedLevel;
-  }
-  return isDecoratorEnabled(items[DECORATOR_ENABLED_KEY])
-    ? DEFAULT_HIGHLIGHT_LEVEL
-    : OFF_HIGHLIGHT_LEVEL;
-}
-
-function isHighlightEnabled(level) {
-  return level !== OFF_HIGHLIGHT_LEVEL;
-}
-
 function saveSettings(bgColor, textColor, highlightLevel) {
-  const normalizedLevel =
-    normalizeHighlightLevel(highlightLevel) ?? DEFAULT_HIGHLIGHT_LEVEL;
   chrome.storage.local.set(
     {
       [HIGHLIGHT_BG_COLOR_KEY]: bgColor,
       [HIGHLIGHT_TEXT_COLOR_KEY]: textColor,
-      [HIGHLIGHT_LEVEL_KEY]: normalizedLevel,
-      [DECORATOR_ENABLED_KEY]: isHighlightEnabled(normalizedLevel),
+      ...createHighlightLevelStorage(highlightLevel),
     },
     () => {
       showStatus("保存しました");

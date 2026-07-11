@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "e-Gov Decorator",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Decorate brackets on e-Gov laws pages",
   "content_scripts": [
     {
       "matches": ["https://elaws.e-gov.go.jp/*", "https://laws.e-gov.go.jp/*"],
-      "js": ["src/content.js"],
+      "js": ["src/settings.js", "src/content.js"],
       "css": ["src/style.css"]
     }
   ],
