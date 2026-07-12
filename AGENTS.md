@@ -21,10 +21,12 @@
 - Chromium 系ブラウザ向けの拡張機能です。
 - 対象は e-Gov 法令ページで、全角括弧 `（...）` をハイライトします。
 - 主な実装箇所:
+  - `src/settings.js`: 既定値、storage キー、設定値の正規化と後方互換処理
   - `src/content.js`: ページ上のハイライト処理本体
   - `src/background.js`: バッジ更新、ショートカット、タブ同期
   - `src/options.js` / `src/options.css`: 表示設定 UI
   - `tests/*.test.js`: `node:test` ベースの単体テスト
+    - `tests/settings.test.js`: 共有設定と各実行コンテキストの読み込み配線
 
 ## 作業ルール
 

@@ -1,10 +1,23 @@
+if (!globalThis.EgovDecoratorSettings) {
+  importScripts("settings.js");
+}
+
+const {
+  DEFAULT_HIGHLIGHT_LEVEL,
+  OFF_HIGHLIGHT_LEVEL,
+  MAX_HIGHLIGHT_LEVEL,
+  STORAGE_KEYS,
+  isDecoratorEnabled,
+  normalizeHighlightLevel,
+  getStoredHighlightLevel,
+  isHighlightEnabled,
+  createHighlightLevelStorage,
+} = globalThis.EgovDecoratorSettings;
+
 const TARGET_URL_PATTERN = /^https:\/\/(?:elaws|laws)\.e-gov\.go\.jp\/law\//;
 const EGOV_DOMAIN_URL_PATTERN = /^https:\/\/(?:elaws|laws)\.e-gov\.go\.jp\//;
-const DECORATOR_ENABLED_KEY = "decoratorEnabled";
-const HIGHLIGHT_LEVEL_KEY = "highlightLevel";
-const DEFAULT_HIGHLIGHT_LEVEL = 0;
-const OFF_HIGHLIGHT_LEVEL = 4;
-const MAX_HIGHLIGHT_LEVEL = OFF_HIGHLIGHT_LEVEL;
+const DECORATOR_ENABLED_KEY = STORAGE_KEYS.decoratorEnabled;
+const HIGHLIGHT_LEVEL_KEY = STORAGE_KEYS.highlightLevel;
 const BADGE_TEXT_OFF = "OFF";
 const BADGE_BG_ON = "#d93025";
 const BADGE_BG_OFF = "#188038";
@@ -23,34 +36,6 @@ function isTargetUrl(url) {
 
 function isEgovDomainUrl(url) {
   return typeof url === "string" && EGOV_DOMAIN_URL_PATTERN.test(url);
-}
-
-function isDecoratorEnabled(value) {
-  return value !== false;
-}
-
-function normalizeHighlightLevel(value) {
-  const level = Number(value);
-  if (!Number.isInteger(level)) return null;
-  if (level < DEFAULT_HIGHLIGHT_LEVEL || level > MAX_HIGHLIGHT_LEVEL) {
-    return null;
-  }
-  return level;
-}
-
-function getStoredHighlightLevel(result) {
-  const items = result && typeof result === "object" ? result : {};
-  const normalizedLevel = normalizeHighlightLevel(items[HIGHLIGHT_LEVEL_KEY]);
-  if (normalizedLevel != null) {
-    return normalizedLevel;
-  }
-  return isDecoratorEnabled(items[DECORATOR_ENABLED_KEY])
-    ? DEFAULT_HIGHLIGHT_LEVEL
-    : OFF_HIGHLIGHT_LEVEL;
-}
-
-function isHighlightEnabled(level) {
-  return level !== OFF_HIGHLIGHT_LEVEL;
 }
 
 function getBadgeText(level) {
@@ -212,11 +197,7 @@ function withHighlightLevel(callback) {
 
 function saveHighlightLevel(highlightLevel, callback) {
   chrome.storage.local.set(
-    {
-      [HIGHLIGHT_LEVEL_KEY]: highlightLevel,
-      // Keep legacy key in sync for backward compatibility.
-      [DECORATOR_ENABLED_KEY]: isHighlightEnabled(highlightLevel),
-    },
+    createHighlightLevelStorage(highlightLevel),
     callback,
   );
 }

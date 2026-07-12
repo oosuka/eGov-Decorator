@@ -1,7 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
-const { loadScript } = require("./helpers/load-script");
+const { loadScripts } = require("./helpers/load-script");
+
+const SCRIPT_PATHS = [
+  path.resolve(__dirname, "..", "src", "settings.js"),
+  path.resolve(__dirname, "..", "src", "content.js"),
+];
 
 class FakeTextNode {
   constructor(value) {
@@ -138,7 +143,7 @@ function createContentContext() {
     console,
   };
 
-  loadScript(path.resolve(__dirname, "..", "src", "content.js"), context);
+  loadScripts(SCRIPT_PATHS, context);
   return { context, FakeElement, FakeTextNode };
 }
 
@@ -284,7 +289,7 @@ function createLifecycleContentContext({
     }
   };
 
-  loadScript(path.resolve(__dirname, "..", "src", "content.js"), context);
+  loadScripts(SCRIPT_PATHS, context);
   return {
     context,
     fakeDocument,
@@ -548,7 +553,12 @@ test("collectDecoratableTextNodes: script/style と既存 highlight 内を除外
 
 test("getStoredHighlightLevel: legacy decoratorEnabled=false は OFF", () => {
   const { context } = createContentContext();
-  assert.equal(context.getStoredHighlightLevel({ decoratorEnabled: false }), 4);
+  assert.equal(
+    context.EgovDecoratorSettings.getStoredHighlightLevel({
+      decoratorEnabled: false,
+    }),
+    4,
+  );
 });
 
 test("removeHighlightInRoot: 同一親の複数spanでも normalize は1回だけ", () => {
@@ -601,9 +611,10 @@ test("removeHighlightInRoot: 親が異なる場合は親ごとに normalize す�
 
 test("isDecoratorEnabled: false のみ無効、それ以外は有効", () => {
   const { context } = createContentContext();
-  assert.equal(context.isDecoratorEnabled(false), false);
-  assert.equal(context.isDecoratorEnabled(undefined), true);
-  assert.equal(context.isDecoratorEnabled(true), true);
+  const { isDecoratorEnabled } = context.EgovDecoratorSettings;
+  assert.equal(isDecoratorEnabled(false), false);
+  assert.equal(isDecoratorEnabled(undefined), true);
+  assert.equal(isDecoratorEnabled(true), true);
 });
 
 test("setHighlightLevel: 非対象URLでは DOM を変更しない", () => {
@@ -663,9 +674,10 @@ test("body 待機中に対象外 URL へ変わったら observer 開始を取り
 
 test("normalizeHighlightLevel: 範囲外は null", () => {
   const { context } = createContentContext();
+  const { normalizeHighlightLevel } = context.EgovDecoratorSettings;
 
-  assert.equal(context.normalizeHighlightLevel(-1), null);
-  assert.equal(context.normalizeHighlightLevel(99), null);
+  assert.equal(normalizeHighlightLevel(-1), null);
+  assert.equal(normalizeHighlightLevel(99), null);
 });
 
 test("applyColorChanges: 色変更時だけ CSS 変数を更新する", () => {

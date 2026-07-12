@@ -1,7 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
-const { loadScript } = require("./helpers/load-script");
+const { loadScripts } = require("./helpers/load-script");
+
+const SCRIPT_PATHS = [
+  path.resolve(__dirname, "..", "src", "settings.js"),
+  path.resolve(__dirname, "..", "src", "options.js"),
+];
 
 class FakeElement {
   constructor(id) {
@@ -66,7 +71,7 @@ function createOptionsContext({ storedValues = {}, storageGetResult } = {}) {
     console,
   };
 
-  loadScript(path.resolve(__dirname, "..", "src", "options.js"), context);
+  loadScripts(SCRIPT_PATHS, context);
 
   return {
     context,

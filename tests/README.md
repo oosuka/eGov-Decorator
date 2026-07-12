@@ -16,6 +16,7 @@
   - `tests/background.test.js`
   - `tests/content.test.js`
   - `tests/options.test.js`
+  - `tests/settings.test.js`
 
 ## Coverage Map
 
@@ -107,7 +108,7 @@
   - 既存 highlight を外して再適用すること
   - 開始直前に無効化された場合に observer 開始後処理を中断すること
 
-現在の単体テスト件数は 94 件です（`npm test`）。
+現在の単体テスト件数は 117 件です（`npm test`）。
 
 ### `options.test.js`
 
@@ -124,6 +125,24 @@
 - `DOMContentLoaded` 後イベント:
   - submit で現在入力値保存
   - reset でデフォルトレベル/色保存
+
+### `settings.test.js`
+
+以下を網羅しています。
+
+- 共有設定定数:
+  - 既定色、ハイライトレベル、storage キーの値と不変性
+- ハイライトレベル正規化:
+  - 0〜4 の整数と数値文字列
+  - 範囲外、小数、非数値の拒否
+- 新旧 storage キー互換:
+  - `highlightLevel` の優先
+  - 不正値から `decoratorEnabled` へのフォールバック
+  - 保存時の `highlightLevel` / `decoratorEnabled` 同期
+- 色設定:
+  - 保存値と既定値の選択
+- 読み込み配線:
+  - content script、popup、background からの `settings.js` 読み込み
 
 ## Residual Gaps
 
