@@ -140,8 +140,10 @@ test("読み込み配線: content と popup は settings.js を先に読み込�
     "src/settings.js",
     "src/content.js",
   ]);
-  assert.ok(
-    popup.indexOf('src="settings.js"') < popup.indexOf('src="options.js"'),
-  );
+  const settingsScriptIndex = popup.indexOf('src="settings.js"');
+  const optionsScriptIndex = popup.indexOf('src="options.js"');
+  assert.notEqual(settingsScriptIndex, -1);
+  assert.notEqual(optionsScriptIndex, -1);
+  assert.ok(settingsScriptIndex < optionsScriptIndex);
   assert.match(background, /importScripts\("settings\.js"\)/);
 });
